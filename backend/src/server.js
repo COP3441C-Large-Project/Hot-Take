@@ -107,7 +107,7 @@ async function handler(request, response) {
       }
 
       // Stores user in database
-      const result = store.register(payload);
+      const result = await store.register(payload);
       // 409 is conflict, 201 is created
       json(response, result.error ? 409 : 201, result);
       return;
@@ -125,7 +125,7 @@ async function handler(request, response) {
       }
 
       // Attempts login
-      const result = store.login(payload);
+      const result = await store.login(payload);
       // 401 is unauthorized, 200 is success
       json(response, result.error ? 401 : 200, result);
       return;
@@ -134,7 +134,7 @@ async function handler(request, response) {
     // Gets current logged in user
     if (request.method === 'GET' && url.pathname === '/api/me'){
       // Gets user from token
-      const user = store.getCurrentUser(token);
+      const user = await store.getCurrentUser(token);
       json(response, user ? 200 : 401, user ? { user } : { error: 'Unauthorized.' });
       return;
     }
@@ -155,14 +155,14 @@ async function handler(request, response) {
       }
 
       // Updates data
-      const result = store.updateInterests(token, { bio, tags });
+      const result = await store.updateInterests(token, { bio, tags });
       json(response, result.error ? 401 : 200, result);
       return;
     }
 
     // Gets matches for user
     if (request.method === 'GET' && url.pathname === '/api/matches'){
-      const result = store.listMatches(token);
+      const result = await store.listMatches(token);
       json(response, result.error ? 401 : 200, result);
       return;
     }
@@ -171,14 +171,14 @@ async function handler(request, response) {
     const startChatMatch = url.pathname.match(/^\/api\/matches\/([^/]+)\/start-chat$/);
     if (request.method === 'POST' && startChatMatch){
       // Starts chat w/ match ID
-      const result = store.startChat(token, startChatMatch[1]);
+      const result = await store.startChat(token, startChatMatch[1]);
       json(response, result.error ? 404 : 201, result);
       return;
     }
 
     // Gets all chats
     if (request.method === 'GET' && url.pathname === '/api/chats'){
-      const result = store.listChats(token);
+      const result = await store.listChats(token);
       json(response, result.error ? 401 : 200, result);
       return;
     }
@@ -187,7 +187,7 @@ async function handler(request, response) {
     const messagesMatch = url.pathname.match(/^\/api\/chats\/([^/]+)\/messages$/);
     // Gets messages for a chat
     if (request.method === 'GET' && messagesMatch){
-      const result = store.getChatMessages(token, messagesMatch[1]);
+      const result = await store.getChatMessages(token, messagesMatch[1]);
       json(response, result.error ? 404 : 200, result);
       return;
     }
@@ -204,7 +204,7 @@ async function handler(request, response) {
       }
 
       // Sends message
-      const result = store.sendMessage(token, messagesMatch[1], payload.text);
+      const result = await store.sendMessage(token, messagesMatch[1], payload.text);
       json(response, result.error ? 404 : 201, result);
       return;
     }

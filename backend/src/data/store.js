@@ -1,10 +1,10 @@
-// For hashing, UUIDs, etc.
 import crypto from 'node:crypto';
+import bcrypt from 'bcrypt';
+import { getDB } from './db.js';
 import { scoreMatch } from '../services/matching.js';
 
 // Helper func to generate short IDs w/ a prefix
 function id(prefix) {
-  // Generates UUID and takes first 8 chars
   return `${prefix}_${crypto.randomUUID().slice(0, 8)}`;
 }
 
@@ -13,13 +13,7 @@ function now() {
   return new Date().toISOString();
 }
 
-// Hashes password using SHA-256(for demo purposes only)
-function hashPassword(password) {
-  // Creates SHA-256 hash object, adds password data, and coverts hash to hext string
-  return crypto.createHash('sha256').update(password).digest('hex');
-}
-
-// Removes sensitive fields before sending urser to client
+// Removes sensitive fields before sending user to client
 function sanitizeUser(user) {
   return {
     id: user.id,
@@ -32,139 +26,45 @@ function sanitizeUser(user) {
   };
 }
 
-// Seeds initial users (fake database)
-function makeSeedUsers() {
-  // Uses the same timestamp for consistency
-  const timestamp = now();
-  return [
-    {
-      // Static demo user for demo
-      id: 'user_demo',
-      username: 'demo_user',
-      email: 'demo@hottake.app',
-      passwordHash: hashPassword('password123'),
-      bio: 'I like arguing about movies, philosophy, and why endings matter more than plot twists.',
-      tags: ['film', 'philosophy', 'writing'],
-      createdAt: timestamp,
-      updatedAt: timestamp,
-      lastActiveAt: timestamp
-    },
-    {
-      id: 'user_stranger01',
-      username: 'stranger_01',
-      email: 'stranger01@hottake.app',
-      passwordHash: hashPassword('password123'),
-      bio: 'I can talk for hours about auteur cinema, existentialism, and overrated classics.',
-      tags: ['film', 'philosophy', 'art'],
-      createdAt: timestamp,
-      updatedAt: timestamp,
-      lastActiveAt: timestamp
-    },
-    {
-      id: 'user_musicnerd',
-      username: 'vinyl_riot',
-      email: 'vinyl@hottake.app',
-      passwordHash: hashPassword('password123'),
-      bio: 'Alt rock is fine, but weird electronic music and music production are where the real fun starts.',
-      tags: ['music', 'production', 'technology'],
-      createdAt: timestamp,
-      updatedAt: timestamp,
-      lastActiveAt: timestamp
-    },
-    {
-      id: 'user_policywonk',
-      username: 'policywonk',
-      email: 'policy@hottake.app',
-      passwordHash: hashPassword('password123'),
-      bio: 'I am into politics, startups, and climate conversations that go deeper than headlines.',
-      tags: ['politics', 'climate', 'startups'],
-      createdAt: timestamp,
-      updatedAt: timestamp,
-      lastActiveAt: timestamp
-    }
-  ];
-}
-
-// Seeds initial chats (fake database)
-function makeSeedChats() {
-  return [
-    {
-      id: 'chat_demo_stranger',
-      participantIds: ['user_demo', 'user_stranger01'],
-      createdAt: now(),
-      updatedAt: now(),
-      messages: [
-        {
-          id: 'msg_1',
-          senderId: 'user_stranger01',
-          text: 'hi, you’re interested in film too?',
-          sentAt: now()
-        },
-        {
-          id: 'msg_2',
-          senderId: 'user_demo',
-          text: 'yeah, i’ve been trying to expand my film genres lately',
-          sentAt: now()
-        }
-      ]
-    }
-  ];
-}
-
-// Main func to create in-memory data store
 export function createStore() {
-  // Initializes users array
-  const users = makeSeedUsers();
-  // Initializes chats array
-  const chats = makeSeedChats();
-  // Map token
+  // Sessions stay in-memory (token → userId)
   const sessions = new Map();
 
-  // Finds user by email
-  function findUserByEmail(email) {
-    return users.find((user) => user.email.toLowerCase() === email.toLowerCase());
-  }
-
-  // Finds user by ID
-  function findUserById(userId) {
-    return users.find((user) => user.id === userId);
+  // Finds user by ID from MongoDB
+  async function findUserById(userId) {
+    return getDB().collection('users').findOne({ id: userId });
   }
 
   // Gets user from auth token
-  function getUserFromToken(token) {
-    // Gets userID from session map
+  async function getUserFromToken(token) {
     const userId = sessions.get(token);
-    // Returns user or undefined
     return userId ? findUserById(userId) : undefined;
   }
 
-  // Creates a session (login)
+  // Creates a session token
   function createSession(userId) {
-    // Generates session token
     const token = crypto.randomUUID();
-    // Stores mapping
     sessions.set(token, userId);
-    // Returns token to client
     return token;
   }
 
-  // Returns public API of the store
   return {
     // Registers a new user
-    register({ username, email, password }) {
+    async register({ username, email, password }) {
+      const col = getDB().collection('users');
+
       // Prevents duplicate emails
-      if (findUserByEmail(email)) {
+      const existing = await col.findOne({ email: email.toLowerCase() });
+      if (existing) {
         return { error: 'Email already registered.' };
       }
 
       const timestamp = now();
       const user = {
-        // Generates user ID
         id: id('user'),
         username,
-        email,
-        // Stores hashed password
-        passwordHash: hashPassword(password),
+        email: email.toLowerCase(),
+        passwordHash: await bcrypt.hash(password, 10),
         bio: '',
         tags: [],
         createdAt: timestamp,
@@ -172,72 +72,73 @@ export function createStore() {
         lastActiveAt: timestamp
       };
 
-      // Adds to (fake) database
-      users.push(user);
+      await col.insertOne(user);
 
       return {
-        // Auto login after register
         token: createSession(user.id),
-        // Returns safe user object
         user: sanitizeUser(user)
       };
     },
 
     // Logins user
-    login({ email, password }) {
-      const user = findUserByEmail(email);
+    async login({ email, password }) {
+      const col = getDB().collection('users');
+
+      const user = await col.findOne({ email: email.toLowerCase() });
 
       // Invalid credentials
-      if (!user || user.passwordHash !== hashPassword(password)) {
+      if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
         return { error: 'Invalid email or password.' };
       }
 
-      // Updates activity timestamp
-      user.lastActiveAt = now();
+      // Updates activity timestamp in MongoDB
+      await col.updateOne({ id: user.id }, { $set: { lastActiveAt: now() } });
 
       return {
-        // Creates session token
         token: createSession(user.id),
         user: sanitizeUser(user)
       };
     },
 
     // Gets currently logged in user
-    getCurrentUser(token) {
-      const user = getUserFromToken(token);
+    async getCurrentUser(token) {
+      const user = await getUserFromToken(token);
       return user ? sanitizeUser(user) : null;
     },
 
     // Updates user bio and tags
-    updateInterests(token, { bio, tags }) {
-      const user = getUserFromToken(token);
+    async updateInterests(token, { bio, tags }) {
+      const user = await getUserFromToken(token);
 
       if (!user) {
         return { error: 'Unauthorized.' };
       }
 
       // Cleans bio
-      user.bio = bio.trim();
-      // Normalizes tags
-      // lowercase, removes duplicates, max 10 tags
-      user.tags = [...new Set(tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean))].slice(0, 10);
-      // Updates timestamps
-      user.updatedAt = now();
-      user.lastActiveAt = now();
+      const cleanBio = bio.trim();
+      // Normalizes tags: lowercase, removes duplicates, max 10 tags
+      const cleanTags = [...new Set(tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean))].slice(0, 10);
+      const timestamp = now();
 
-      return { user: sanitizeUser(user) };
+      await getDB().collection('users').updateOne(
+        { id: user.id },
+        { $set: { bio: cleanBio, tags: cleanTags, updatedAt: timestamp, lastActiveAt: timestamp } }
+      );
+
+      return { user: sanitizeUser({ ...user, bio: cleanBio, tags: cleanTags, updatedAt: timestamp }) };
     },
 
     // Gets matches for current user
-    listMatches(token) {
-      const currentUser = getUserFromToken(token);
+    async listMatches(token) {
+      const currentUser = await getUserFromToken(token);
 
       if (!currentUser) {
         return { error: 'Unauthorized.' };
       }
 
-      const results = users
-        .filter((candidate) => candidate.id !== currentUser.id)
+      const candidates = await getDB().collection('users').find({ id: { $ne: currentUser.id } }).toArray();
+
+      const results = candidates
         .map((candidate) => {
           const match = scoreMatch(currentUser, candidate);
           return {
@@ -259,20 +160,20 @@ export function createStore() {
     },
 
     // Lists chats for current user
-    listChats(token) {
-      const currentUser = getUserFromToken(token);
+    async listChats(token) {
+      const currentUser = await getUserFromToken(token);
 
       if (!currentUser) {
         return { error: 'Unauthorized.' };
       }
 
-      const results = chats
-        .filter((chat) => chat.participantIds.includes(currentUser.id))
-        .map((chat) => {
+      const chats = await getDB().collection('chats').find({ participantIds: currentUser.id }).toArray();
+
+      const results = await Promise.all(
+        chats.map(async (chat) => {
           // Gets other participant
-          const otherUserId = chat.participantIds.find((participantId) => participantId !== currentUser.id);
-          // Gets last message
-          const otherUser = findUserById(otherUserId);
+          const otherUserId = chat.participantIds.find((pid) => pid !== currentUser.id);
+          const otherUser = otherUserId ? await findUserById(otherUserId) : null;
           const lastMessage = chat.messages.at(-1) ?? null;
           const match = otherUser ? scoreMatch(currentUser, otherUser) : { score: 0, sharedTags: [] };
 
@@ -283,20 +184,21 @@ export function createStore() {
             sharedTags: match.sharedTags,
             lastMessage
           };
-        });
+        })
+      );
 
       return { chats: results };
     },
 
-    // Gets meqssages for a chat
-    getChatMessages(token, chatId) {
-      const currentUser = getUserFromToken(token);
+    // Gets messages for a chat
+    async getChatMessages(token, chatId) {
+      const currentUser = await getUserFromToken(token);
 
       if (!currentUser) {
         return { error: 'Unauthorized.' };
       }
 
-      const chat = chats.find((entry) => entry.id === chatId && entry.participantIds.includes(currentUser.id));
+      const chat = await getDB().collection('chats').findOne({ id: chatId, participantIds: currentUser.id });
 
       if (!chat) {
         return { error: 'Chat not found.' };
@@ -306,22 +208,23 @@ export function createStore() {
     },
 
     // Starts a new chat w/ a match
-    startChat(token, matchUserId) {
-      const currentUser = getUserFromToken(token);
-      const matchUser = findUserById(matchUserId);
+    async startChat(token, matchUserId) {
+      const currentUser = await getUserFromToken(token);
 
       if (!currentUser) {
         return { error: 'Unauthorized.' };
       }
 
+      const matchUser = await findUserById(matchUserId);
+
       if (!matchUser || matchUser.id === currentUser.id) {
         return { error: 'Match user not found.' };
       }
 
+      const col = getDB().collection('chats');
+
       // Checks if chat already exists
-      const existingChat = chats.find((chat) => {
-        return chat.participantIds.includes(currentUser.id) && chat.participantIds.includes(matchUser.id);
-      });
+      const existingChat = await col.findOne({ participantIds: { $all: [currentUser.id, matchUser.id] } });
 
       if (existingChat) {
         return { chatId: existingChat.id };
@@ -335,19 +238,20 @@ export function createStore() {
         messages: []
       };
 
-      chats.push(chat);
+      await col.insertOne(chat);
       return { chatId: chat.id };
     },
 
     // Sends a message in a chat
-    sendMessage(token, chatId, text) {
-      const currentUser = getUserFromToken(token);
+    async sendMessage(token, chatId, text) {
+      const currentUser = await getUserFromToken(token);
 
       if (!currentUser) {
         return { error: 'Unauthorized.' };
       }
 
-      const chat = chats.find((entry) => entry.id === chatId && entry.participantIds.includes(currentUser.id));
+      const col = getDB().collection('chats');
+      const chat = await col.findOne({ id: chatId, participantIds: currentUser.id });
 
       if (!chat) {
         return { error: 'Chat not found.' };
@@ -360,12 +264,17 @@ export function createStore() {
         sentAt: now()
       };
 
-      // Adds a message to chat
-      chat.messages.push(message);
-      // Updates chat timestamp
-      chat.updatedAt = now();
+      // Adds message and updates chat timestamp
+      await col.updateOne(
+        { id: chatId },
+        { $push: { messages: message }, $set: { updatedAt: now() } }
+      );
+
       // Updates user activity
-      currentUser.lastActiveAt = now();
+      await getDB().collection('users').updateOne(
+        { id: currentUser.id },
+        { $set: { lastActiveAt: now() } }
+      );
 
       return { message };
     }
