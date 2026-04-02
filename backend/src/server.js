@@ -4,6 +4,12 @@ import { createServer } from 'node:http';
 import { URL } from 'node:url';
 // Acts like a fake database
 import { createStore } from './data/store.js';
+import { connectDB } from './data/db.js';
+
+if (!process.env.MONGODB_URI) {
+  console.error('Error: MONGODB_URI environment variable is not set.');
+  process.exit(1);
+}
 
 // No env variable available yet, so this is the port the server will run on
 const PORT = Number(process.env.PORT ?? 3001);
@@ -64,7 +70,7 @@ function isValidAuthPayload(payload){
 }
 
 // Creates HTTP server
-createServer(async (request, response) => {
+async function handler(request, response) {
   // If request is messed up, returns 400 Bad Request
   if (!request.url || !request.method) {
     json(response, 400, { error: 'Bad request.' });
@@ -211,7 +217,17 @@ createServer(async (request, response) => {
       details: error instanceof Error ? error.message : 'Unknown error.'
     });
   }
-}).listen(PORT, HOST, () => {
-  // Starts server and logs where it's running
-  console.log(`Hot Take backend listening on http://${HOST}:${PORT}`);
-});
+}
+
+const server = createServer(handler);
+
+connectDB()
+  .then(() => {
+    server.listen(PORT, HOST, () => {
+      console.log(`Hot Take backend listening on http://${HOST}:${PORT}`);
+    });
+  })
+  .catch((error) => {
+    console.error('Failed to connect to MongoDB:', error.message);
+    process.exit(1);
+  });
