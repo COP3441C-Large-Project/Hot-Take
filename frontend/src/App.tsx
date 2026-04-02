@@ -2,6 +2,7 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import MatchesPage from "./pages/MatchesPage";
+import AuthPage from "./pages/AuthPage";
 import "./index.css";
 
 const PlaceholderPage: React.FC<{ title: string }> = ({ title }) => (
@@ -32,7 +33,7 @@ const App: React.FC = () => {
     <BrowserRouter>
       <Navbar onSignOut={handleSignOut} />
       <Routes>
-        <Route path="/" element={<PlaceholderPage title="home" />} />
+        <Route path="/" element={<AuthPage />} />
         <Route path="/how-it-works" element={<PlaceholderPage title="how it works" />} />
         <Route path="/interests" element={<PlaceholderPage title="interests" />} />
         <Route path="/matches" element={<MatchesPage />} />
