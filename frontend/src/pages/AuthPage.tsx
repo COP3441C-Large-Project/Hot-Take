@@ -1,10 +1,17 @@
 import React from "react";
+import { Navigate } from "react-router-dom";
 import AuthForm from "../components/AuthForm";
+import { useAuth } from "../hooks/useAuth";
 
 type AuthTab = "login" | "register";
 
 const AuthPage: React.FC = () => {
+  const { isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = React.useState<AuthTab>("login");
+
+  if (isAuthenticated) {
+    return <Navigate to="/interests" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-white flex">

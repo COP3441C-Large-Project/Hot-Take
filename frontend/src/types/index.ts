@@ -20,3 +20,18 @@ export interface User {
   username: string;
   interests: string[];
 }
+
+export interface AuthUser {
+  id: string;
+  username: string;
+  email: string;
+  bio: string;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: AuthUser;
+}
