@@ -1,3 +1,4 @@
+import { Server } from 'socket.io';
 // To create a web server
 import { createServer } from 'node:http';
 // To easily work w/ URLs and query parameters
@@ -220,6 +221,43 @@ async function handler(request, response) {
 }
 
 const server = createServer(handler);
+
+const io = new Server(server, {
+  cors: {
+    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'], //UPDATE WHEN REMOTELY HOSTED
+    methods: ['GET', 'POST']
+  }
+});
+
+io.on('connection', async (socket) => {
+  const token = socket.handshake.auth.token ?? '';
+  const user = await store.getCurrentUser(token);
+
+  console.log('authenticated as:', user?.username ?? 'INVALID TOKEN');
+
+  if (!user) {
+    console.log('disconnecting — invalid token');
+    socket.disconnect();
+    return;
+  }
+
+  socket.on('join_chat', (chatId) => {
+    console.log(`${user.username} joined chat:`, chatId);
+    socket.join(chatId);
+  });
+
+  socket.on('send_message', async ({ chatId, text }) => {
+    console.log(`${user.username} sent message in ${chatId}:`, text);
+    const result = await store.sendMessage(token, chatId, text);
+    if (result.error) return;
+    socket.to(chatId).emit('receive_message', result.message);
+    socket.emit('message_sent', result.message);
+  });
+
+  socket.on('typing', (chatId) => {
+    socket.to(chatId).emit('typing');
+  });
+});
 
 connectDB()
   .then(() => {
