@@ -27,9 +27,9 @@ jobs:
       - name: Build
         working-directory: frontend
         run: npm run build
-        env:
-          # Add any frontend env vars your Vite build needs, e.g.:
-          # VITE_API_URL: ${{ secrets.VITE_API_URL }}
+        # To pass frontend env vars to the Vite build, add them here like so:
+        # env:
+        #   VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
       # ---------------------------------------------------------------
       # Replace the step below with your actual hosting provider.
