@@ -12,6 +12,20 @@ if (!process.env.MONGODB_URI) {
   process.exit(1);
 }
 
+import sgMail from '@sendgrid/mail';
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+ 
+// Helper to send email via SendGrid
+async function sendEmail({ to, subject, text, html }) {
+  await sgMail.send({
+    to,
+    from: process.env.SENDGRID_FROM_EMAIL,
+    subject,
+    text,
+    html,
+  });
+}
+
 // No env variable available yet, so this is the port the server will run on
 const PORT = Number(process.env.PORT ?? 3001);
 // The IP address the server will bind to
@@ -131,6 +145,55 @@ async function handler(request, response) {
       json(response, result.error ? 401 : 200, result);
       return;
     }
+
+    // Sends verification email after registration
+    if (request.method === 'POST' && url.pathname === '/api/auth/send-verification') {
+      const payload = await readBody(request);
+      if (!payload.userId) {
+        json(response, 400, { error: 'userId is required.' });
+        return;
+      }
+      const result = await store.sendVerificationEmail(payload.userId, sendEmail);
+      json(response, result.error ? 400 : 200, result);
+      return;
+    }
+ 
+    // Verifies email from link
+    if (request.method === 'POST' && url.pathname === '/api/auth/verify-email') {
+      const payload = await readBody(request);
+      if (!payload.token) {
+        json(response, 400, { error: 'token is required.' });
+        return;
+      }
+      const result = await store.verifyEmail(payload.token);
+      json(response, result.error ? 400 : 200, result);
+      return;
+    }
+ 
+    // Sends password reset email
+    if (request.method === 'POST' && url.pathname === '/api/auth/forgot-password') {
+      const payload = await readBody(request);
+      if (!payload.email?.trim()) {
+        json(response, 400, { error: 'email is required.' });
+        return;
+      }
+      const result = await store.sendPasswordResetEmail(payload.email, sendEmail);
+      json(response, result.error ? 400 : 200, result);
+      return;
+    }
+ 
+    // Resets password
+    if (request.method === 'POST' && url.pathname === '/api/auth/reset-password') {
+      const payload = await readBody(request);
+      if (!payload.token?.trim() || !payload.password?.trim()) {
+        json(response, 400, { error: 'token and password are required.' });
+        return;
+      }
+      const result = await store.resetPassword(payload.token, payload.password);
+      json(response, result.error ? 400 : 200, result);
+      return;
+    }
+ 
 
     // Gets current logged in user
     if (request.method === 'GET' && url.pathname === '/api/me'){

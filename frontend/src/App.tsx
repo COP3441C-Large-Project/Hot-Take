@@ -4,6 +4,8 @@ import Navbar from "./components/Navbar";
 import MatchesPage from "./pages/MatchesPage";
 import AuthPage from "./pages/AuthPage";
 import { useAuth } from "./hooks/useAuth";
+import VerifyEmailPage from "./pages/VerifyEmailPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import "./index.css";
 
 const PlaceholderPage: React.FC<{ title: string }> = ({ title }) => (
@@ -48,6 +50,8 @@ const App: React.FC = () => {
     <BrowserRouter>
       <Navbar onSignOut={isAuthenticated ? handleSignOut : undefined} />
       <Routes>
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/" element={<AuthPage />} />
         <Route path="/how-it-works" element={<PlaceholderPage title="how it works" />} />
         <Route
@@ -75,6 +79,7 @@ const App: React.FC = () => {
           )}
         />
         <Route path="*" element={<Navigate to="/" replace />} />
+      
       </Routes>
     </BrowserRouter>
   );

@@ -8,6 +8,7 @@
     "start": "node --env-file=.env src/server.js"
   },
   "dependencies": {
+    "@sendgrid/mail": "^8.1.6",
     "bcrypt": "^6.0.0",
     "mongodb": "^6.7.0",
     "socket.io": "^4.8.3"

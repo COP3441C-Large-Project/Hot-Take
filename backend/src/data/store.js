@@ -61,16 +61,17 @@ export function createStore() {
 
       const timestamp = now();
       const user = {
-        id: id('user'),
-        username,
-        email: email.toLowerCase(),
-        passwordHash: await bcrypt.hash(password, 10),
-        bio: '',
-        tags: [],
-        createdAt: timestamp,
-        updatedAt: timestamp,
-        lastActiveAt: timestamp
-      };
+          id: id('user'),
+          username,
+          email: email.toLowerCase(),
+          passwordHash: await bcrypt.hash(password, 10),
+          emailVerified: false,  // add this line
+          bio: '',
+          tags: [],
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          lastActiveAt: timestamp
+        };
 
       await col.insertOne(user);
 
@@ -89,6 +90,10 @@ export function createStore() {
       // Invalid credentials
       if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
         return { error: 'Invalid email or password.' };
+      }
+
+      if (!user.emailVerified) {
+        return { error: 'Please verify your email before logging in.' };
       }
 
       // Updates activity timestamp in MongoDB
@@ -277,6 +282,130 @@ export function createStore() {
       );
 
       return { message };
-    }
+    },
+
+    async sendVerificationEmail(userId, sendEmail) {
+      const col = getDB().collection('users');
+      const user = await findUserById(userId);
+      if (!user) return { error: 'User not found.' };
+ 
+      // Generate a token and expiry (24 hours)
+      const verifyToken = crypto.randomUUID();
+      const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+ 
+      await col.updateOne(
+        { id: userId },
+        { $set: { verifyToken, verifyTokenExpiry: expiry } }
+      );
+      console.log('Verification URL:', `${process.env.APP_URL}/verify-email?token=${verifyToken}`);
+      await sendEmail({
+        to: user.email,
+        subject: 'verify your hot take account',
+        text: `click to verify: ${process.env.APP_URL}/verify-email?token=${verifyToken}`,
+        html: `
+        <div style="font-family: monospace; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+          <h1 style="font-size: 2rem; margin-bottom: 4px;">hot take<span style="color:#d44b3a">.</span></h1>
+          <p style="color: #5c5752; margin-bottom: 32px;">interest-based matchmaking</p>
+          <p style="margin-bottom: 24px;">click the button below to verify your email address.</p>
+          <a 
+            href="${process.env.APP_URL}/verify-email?token=${verifyToken}" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style="display: inline-block; background-color: #d44b3a; color: #ffffff; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-family: monospace; font-weight: bold;"
+          >
+            VERIFY EMAIL
+          </a>
+          <p style="margin-top: 24px; font-size: 0.85rem; color: #5c5752;">
+            or copy this link into your browser:<br/>
+            <span style="word-break:break-all;">${process.env.APP_URL}/verify-email?token=${verifyToken}</span>
+          </p>
+          <p style="margin-top: 32px; font-size: 0.75rem; color: #9e9894;">
+            this link expires in 24 hours. if you didn't create an account, ignore this email.
+          </p>
+        </div>
+      `
+      });
+ 
+      return { ok: true };
+    },
+ 
+    // Verifies email token
+    async verifyEmail(verifyToken) {
+      const col = getDB().collection('users');
+      const user = await col.findOne({ verifyToken });
+ 
+      if (!user) return { error: 'Invalid or expired verification link.' };
+      if (new Date(user.verifyTokenExpiry) < new Date()) {
+        return { error: 'Verification link has expired.' };
+      }
+ 
+      await col.updateOne(
+        { id: user.id },
+        { $set: { emailVerified: true }, $unset: { verifyToken: '', verifyTokenExpiry: '' } }
+      );
+ 
+      return { token: createSession(user.id), user: sanitizeUser({ ...user, emailVerified: true }) };
+    },
+ 
+    // Sends forgot password email
+    async sendPasswordResetEmail(email, sendEmail) {
+      const col = getDB().collection('users');
+      const user = await col.findOne({ email: email.toLowerCase() });
+ 
+      // Don't reveal whether email exists
+      if (!user) return { ok: true };
+ 
+      const resetToken = crypto.randomUUID();
+      const expiry = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
+ 
+      await col.updateOne(
+        { id: user.id },
+        { $set: { resetToken, resetTokenExpiry: expiry } }
+      );
+ 
+      await sendEmail({
+        to: user.email,
+        subject: 'reset your hot take password',
+        text: `click to reset: ${process.env.APP_URL}/reset-password?token=${resetToken}`,
+        html: `
+          <div style="font-family: monospace; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+            <h1 style="font-size: 2rem; margin-bottom: 4px;">hot take<span style="color:#d44b3a">.</span></h1>
+            <p style="color: #5c5752; margin-bottom: 32px;">interest-based matchmaking</p>
+            <p style="margin-bottom: 24px;">someone requested a password reset for this account.</p>
+            <a href="${process.env.APP_URL}/reset-password?token=${resetToken}"
+               style="display:inline-block;background:#d44b3a;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-family:monospace;">
+              reset password →
+            </a>
+            <p style="margin-top: 32px; font-size: 0.75rem; color: #9e9894;">
+              this link expires in 1 hour. if you didn't request this, ignore this email.
+            </p>
+          </div>
+        `
+      });
+ 
+      return { ok: true };
+    },
+ 
+    // Resets password using token
+    async resetPassword(resetToken, newPassword) {
+      const col = getDB().collection('users');
+      const user = await col.findOne({ resetToken });
+ 
+      if (!user) return { error: 'Invalid or expired reset link.' };
+      if (new Date(user.resetTokenExpiry) < new Date()) {
+        return { error: 'Reset link has expired.' };
+      }
+ 
+      await col.updateOne(
+        { id: user.id },
+        {
+          $set: { passwordHash: await bcrypt.hash(newPassword, 10), updatedAt: now() },
+          $unset: { resetToken: '', resetTokenExpiry: '' }
+        }
+      );
+ 
+      return { token: createSession(user.id), user: sanitizeUser(user) };
+    },
+ 
   };
 }
