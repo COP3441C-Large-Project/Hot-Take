@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'controllers/matches_controller.dart';
+import 'services/matches_api.dart';
+import 'services/socket_service.dart';
+import 'screens/matches_page.dart';
 import 'controllers/auth_controller.dart';
 import 'screens/auth_landing_page.dart';
 import 'screens/home_placeholder_page.dart';
@@ -54,7 +58,7 @@ class HotTakeApp extends StatelessWidget {
           }
 
           if (controller.isAuthenticated) {
-            return HomePlaceholderPage(controller: controller);
+            return _MatchesShell(authController: controller);
           }
 
           return AuthLandingPage(controller: controller);
@@ -82,6 +86,53 @@ class _BootScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _MatchesShell extends StatefulWidget {
+  final AuthController controller;
+  const _MatchesShell({required this.controller});
+ 
+  @override
+  State<_MatchesShell> createState() => _MatchesShellState();
+}
+ 
+class _MatchesShellState extends State<_MatchesShell> {
+  late final MatchesController _matchesController;
+  late final SocketService _socketService;
+ 
+  @override
+  void initState() {
+    super.initState();
+ 
+    final token = widget.controller.token!;
+    final userId = widget.controller.user!.id;
+ 
+    _matchesController = MatchesController(
+      api: MatchesApi(),
+      token: token,
+      userId: userId,
+    );
+ 
+    _socketService = SocketService(token: token, userId: userId);
+    _socketService.attach(_matchesController);
+    _socketService.connect('http://127.0.0.1:3001'); // same baseUrl as AuthApi
+  }
+ 
+  @override
+  void dispose() {
+    _socketService.disconnect();
+    _matchesController.dispose();
+    super.dispose();
+  }
+ 
+  @override
+  Widget build(BuildContext context) {
+    return MatchesPage(
+      matchesController: _matchesController,
+      authController: widget.controller,
+      socketService: _socketService,
     );
   }
 }
