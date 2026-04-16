@@ -29,8 +29,7 @@ async function sendEmail({ to, subject, text, html }) {
 // No env variable available yet, so this is the port the server will run on
 const PORT = Number(process.env.PORT ?? 3001);
 // The IP address the server will bind to
-const HOST = process.env.HOST ?? '127.0.0.1';
-// Initializes the data store, which holds users, chats, and matches in memory
+const HOST = process.env.HOST ?? '0.0.0.0';
 const store = createStore();
 
 // Helper func to send JSON responses back to the client
@@ -287,7 +286,7 @@ const server = createServer(handler);
 
 const io = new Server(server, {
   cors: {
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'], //UPDATE WHEN REMOTELY HOSTED
+    origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://167.99.155.122'],
     methods: ['GET', 'POST']
   }
 });
