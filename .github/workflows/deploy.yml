@@ -64,8 +64,23 @@ jobs:
       # - name: Trigger deploy
       #   run: curl -X POST "${{ secrets.DEPLOY_WEBHOOK_URL }}"
       # ---------------------------------------------------------------
-      - name: Deploy backend (configure this step)
-        run: echo "Configure your backend deployment here."
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: 167.99.155.122
+          username: ivie
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            cd /home/ivie/COP4331-Large-Project
+            git pull origin main
+            cd frontend
+            npm install
+            npm run build
+            cd ../backend
+            npm install
+            pm2 restart all || pm2 start src/server.js --name backend
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           # Add any other backend secrets your server needs
