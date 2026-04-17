@@ -7,6 +7,7 @@ import { URL } from 'node:url';
 import { createStore } from './data/store.js';
 import { connectDB } from './data/db.js';
 
+
 if (!process.env.MONGODB_URI) {
   console.error('Error: MONGODB_URI environment variable is not set.');
   process.exit(1);
@@ -30,6 +31,8 @@ async function sendEmail({ to, subject, text, html }) {
 const PORT = Number(process.env.PORT ?? 3001);
 // The IP address the server will bind to
 const HOST = process.env.HOST ?? '0.0.0.0';
+const CLIENT_URL = process.env.APP_URL ?? 'http://localhost:5173';
+// Initializes the data store, which holds users, chats, and matches in memory
 const store = createStore();
 
 // Helper func to send JSON responses back to the client
@@ -43,7 +46,8 @@ function json(response, statusCode, payload){
     // Allows specific headers
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     // Allows specific HTTP methods
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS'
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true'
   });
   // Sends JSON response
   response.end(JSON.stringify(payload, null, 2));
@@ -94,17 +98,17 @@ async function handler(request, response) {
   // Handles CORS preflight requests
   if (request.method === 'OPTIONS') {
   response.writeHead(204, {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': CLIENT_URL,
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
-    'Content-Length': '0',
+    'Access-Control-Allow-Credentials': 'true'
   });
   response.end();
   return;
 }
 
   // Parses URL
-  const url = new URL(request.url, `http://localhost:${PORT}`);
+  const url = new URL(request.url, `http://${HOST}:${PORT}`);
   // Extracts token from request headers
   const token = getToken(request);
 
@@ -292,8 +296,10 @@ const server = createServer(handler);
 
 const io = new Server(server, {
   cors: {
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://167.99.155.122'],
-    methods: ['GET', 'POST']
+    // Add your production domain here
+    origin: [CLIENT_URL,'http://localhost:5173'], 
+    methods: ['GET', 'POST'],
+    credentials: true
   }
 });
 
@@ -331,6 +337,7 @@ connectDB()
   .then(() => {
     server.listen(PORT, HOST, () => {
       console.log(`Hot Take backend listening on http://${HOST}:${PORT}`);
+      console.log(`CORS allowed for: ${CLIENT_URL}`);
     });
   })
   .catch((error) => {
