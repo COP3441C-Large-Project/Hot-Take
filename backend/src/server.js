@@ -1,14 +1,37 @@
+import { Server } from 'socket.io';
 // To create a web server
 import { createServer } from 'node:http';
 // To easily work w/ URLs and query parameters
 import { URL } from 'node:url';
 // Acts like a fake database
 import { createStore } from './data/store.js';
+import { connectDB } from './data/db.js';
+
+
+if (!process.env.MONGODB_URI) {
+  console.error('Error: MONGODB_URI environment variable is not set.');
+  process.exit(1);
+}
+
+import sgMail from '@sendgrid/mail';
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+ 
+// Helper to send email via SendGrid
+async function sendEmail({ to, subject, text, html }) {
+  await sgMail.send({
+    to,
+    from: process.env.SENDGRID_FROM_EMAIL,
+    subject,
+    text,
+    html,
+  });
+}
 
 // No env variable available yet, so this is the port the server will run on
 const PORT = Number(process.env.PORT ?? 3001);
 // The IP address the server will bind to
-const HOST = process.env.HOST ?? '127.0.0.1';
+const HOST = process.env.HOST ?? '0.0.0.0';
+const CLIENT_URL = process.env.APP_URL ?? 'http://localhost:5173';
 // Initializes the data store, which holds users, chats, and matches in memory
 const store = createStore();
 
@@ -23,7 +46,8 @@ function json(response, statusCode, payload){
     // Allows specific headers
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     // Allows specific HTTP methods
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS'
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true'
   });
   // Sends JSON response
   response.end(JSON.stringify(payload, null, 2));
@@ -64,7 +88,7 @@ function isValidAuthPayload(payload){
 }
 
 // Creates HTTP server
-createServer(async (request, response) => {
+async function handler(request, response) {
   // If request is messed up, returns 400 Bad Request
   if (!request.url || !request.method) {
     json(response, 400, { error: 'Bad request.' });
@@ -72,13 +96,19 @@ createServer(async (request, response) => {
   }
 
   // Handles CORS preflight requests
-  if (request.method === 'OPTIONS'){
-    json(response, 204, {});
-    return;
-  }
+  if (request.method === 'OPTIONS') {
+  response.writeHead(204, {
+    'Access-Control-Allow-Origin': CLIENT_URL,
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true'
+  });
+  response.end();
+  return;
+}
 
   // Parses URL
-  const url = new URL(request.url, `http://localhost:${PORT}`);
+  const url = new URL(request.url, `http://${HOST}:${PORT}`);
   // Extracts token from request headers
   const token = getToken(request);
 
@@ -101,7 +131,7 @@ createServer(async (request, response) => {
       }
 
       // Stores user in database
-      const result = store.register(payload);
+      const result = await store.register(payload);
       // 409 is conflict, 201 is created
       json(response, result.error ? 409 : 201, result);
       return;
@@ -119,16 +149,65 @@ createServer(async (request, response) => {
       }
 
       // Attempts login
-      const result = store.login(payload);
+      const result = await store.login(payload);
       // 401 is unauthorized, 200 is success
       json(response, result.error ? 401 : 200, result);
       return;
     }
 
+    // Sends verification email after registration
+    if (request.method === 'POST' && url.pathname === '/api/auth/send-verification') {
+      const payload = await readBody(request);
+      if (!payload.userId) {
+        json(response, 400, { error: 'userId is required.' });
+        return;
+      }
+      const result = await store.sendVerificationEmail(payload.userId, sendEmail);
+      json(response, result.error ? 400 : 200, result);
+      return;
+    }
+ 
+    // Verifies email from link
+    if (request.method === 'POST' && url.pathname === '/api/auth/verify-email') {
+      const payload = await readBody(request);
+      if (!payload.token) {
+        json(response, 400, { error: 'token is required.' });
+        return;
+      }
+      const result = await store.verifyEmail(payload.token);
+      json(response, result.error ? 400 : 200, result);
+      return;
+    }
+ 
+    // Sends password reset email
+    if (request.method === 'POST' && url.pathname === '/api/auth/forgot-password') {
+      const payload = await readBody(request);
+      if (!payload.email?.trim()) {
+        json(response, 400, { error: 'email is required.' });
+        return;
+      }
+      const result = await store.sendPasswordResetEmail(payload.email, sendEmail);
+      json(response, result.error ? 400 : 200, result);
+      return;
+    }
+ 
+    // Resets password
+    if (request.method === 'POST' && url.pathname === '/api/auth/reset-password') {
+      const payload = await readBody(request);
+      if (!payload.token?.trim() || !payload.password?.trim()) {
+        json(response, 400, { error: 'token and password are required.' });
+        return;
+      }
+      const result = await store.resetPassword(payload.token, payload.password);
+      json(response, result.error ? 400 : 200, result);
+      return;
+    }
+ 
+
     // Gets current logged in user
     if (request.method === 'GET' && url.pathname === '/api/me'){
       // Gets user from token
-      const user = store.getCurrentUser(token);
+      const user = await store.getCurrentUser(token);
       json(response, user ? 200 : 401, user ? { user } : { error: 'Unauthorized.' });
       return;
     }
@@ -149,14 +228,14 @@ createServer(async (request, response) => {
       }
 
       // Updates data
-      const result = store.updateInterests(token, { bio, tags });
+      const result = await store.updateInterests(token, { bio, tags });
       json(response, result.error ? 401 : 200, result);
       return;
     }
 
     // Gets matches for user
     if (request.method === 'GET' && url.pathname === '/api/matches'){
-      const result = store.listMatches(token);
+      const result = await store.listMatches(token);
       json(response, result.error ? 401 : 200, result);
       return;
     }
@@ -165,14 +244,14 @@ createServer(async (request, response) => {
     const startChatMatch = url.pathname.match(/^\/api\/matches\/([^/]+)\/start-chat$/);
     if (request.method === 'POST' && startChatMatch){
       // Starts chat w/ match ID
-      const result = store.startChat(token, startChatMatch[1]);
+      const result = await store.startChat(token, startChatMatch[1]);
       json(response, result.error ? 404 : 201, result);
       return;
     }
 
     // Gets all chats
     if (request.method === 'GET' && url.pathname === '/api/chats'){
-      const result = store.listChats(token);
+      const result = await store.listChats(token);
       json(response, result.error ? 401 : 200, result);
       return;
     }
@@ -181,7 +260,7 @@ createServer(async (request, response) => {
     const messagesMatch = url.pathname.match(/^\/api\/chats\/([^/]+)\/messages$/);
     // Gets messages for a chat
     if (request.method === 'GET' && messagesMatch){
-      const result = store.getChatMessages(token, messagesMatch[1]);
+      const result = await store.getChatMessages(token, messagesMatch[1]);
       json(response, result.error ? 404 : 200, result);
       return;
     }
@@ -198,7 +277,7 @@ createServer(async (request, response) => {
       }
 
       // Sends message
-      const result = store.sendMessage(token, messagesMatch[1], payload.text);
+      const result = await store.sendMessage(token, messagesMatch[1], payload.text);
       json(response, result.error ? 404 : 201, result);
       return;
     }
@@ -211,7 +290,57 @@ createServer(async (request, response) => {
       details: error instanceof Error ? error.message : 'Unknown error.'
     });
   }
-}).listen(PORT, HOST, () => {
-  // Starts server and logs where it's running
-  console.log(`Hot Take backend listening on http://${HOST}:${PORT}`);
+}
+
+const server = createServer(handler);
+
+const io = new Server(server, {
+  cors: {
+    // Add your production domain here
+    origin: [CLIENT_URL,'http://localhost:5173'], 
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
 });
+
+io.on('connection', async (socket) => {
+  const token = socket.handshake.auth.token ?? '';
+  const user = await store.getCurrentUser(token);
+
+  console.log('authenticated as:', user?.username ?? 'INVALID TOKEN');
+
+  if (!user) {
+    console.log('disconnecting — invalid token');
+    socket.disconnect();
+    return;
+  }
+
+  socket.on('join_chat', (chatId) => {
+    console.log(`${user.username} joined chat:`, chatId);
+    socket.join(chatId);
+  });
+
+  socket.on('send_message', async ({ chatId, text }) => {
+    console.log(`${user.username} sent message in ${chatId}:`, text);
+    const result = await store.sendMessage(token, chatId, text);
+    if (result.error) return;
+    socket.to(chatId).emit('receive_message', result.message);
+    socket.emit('message_sent', result.message);
+  });
+
+  socket.on('typing', (chatId) => {
+    socket.to(chatId).emit('typing');
+  });
+});
+
+connectDB()
+  .then(() => {
+    server.listen(PORT, HOST, () => {
+      console.log(`Hot Take backend listening on http://${HOST}:${PORT}`);
+      console.log(`CORS allowed for: ${CLIENT_URL}`);
+    });
+  })
+  .catch((error) => {
+    console.error('Failed to connect to MongoDB:', error.message);
+    process.exit(1);
+  });

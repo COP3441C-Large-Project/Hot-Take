@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { io, Socket } from "socket.io-client";
 import { Message } from "../types";
 
 type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
 
 interface UseChatOptions {
-  matchId: string | null;
+  chatId: string | null;
+  token: string;
   userId: string;
   onMessage?: (message: Message) => void;
 }
@@ -16,143 +18,156 @@ interface UseChatReturn {
   isTyping: boolean;
 }
 
-// Stub: replace WS_URL with your actual WebSocket server endpoint
-const WS_URL = ""; // e.g. "wss://your-api.example.com/chat"
+const SERVER_URL = "http://localhost:3001";
 
-export function useChat({ matchId, userId, onMessage }: UseChatOptions): UseChatReturn {
+export function useChat({ chatId, token, userId, onMessage }: UseChatOptions): UseChatReturn {
   const [messages, setMessages] = useState<Message[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("disconnected");
   const [isTyping, setIsTyping] = useState(false);
-  const wsRef = useRef<WebSocket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Seed with mock messages so the UI looks alive ────────────────────────
+  //Load message history when chatId changes 
   useEffect(() => {
-    if (!matchId) {
+    if (!chatId || !token?.trim()) {
       setMessages([]);
       return;
     }
 
-    const mockSeed: Message[] = [
-      {
-        id: "1",
-        senderId: matchId,
-        content: "hi, you're interested in film too?",
-        timestamp: new Date(Date.now() - 25 * 60 * 1000),
-        isOwn: false,
-      },
-      {
-        id: "2",
-        senderId: userId,
-        content: "yeah, i've been trying to expand my film genres lately",
-        timestamp: new Date(Date.now() - 24 * 60 * 1000),
-        isOwn: true,
-      },
-      {
-        id: "3",
-        senderId: matchId,
-        content: "have you checked out..",
-        timestamp: new Date(Date.now() - 21 * 60 * 1000),
-        isOwn: false,
-      },
-      {
-        id: "4",
-        senderId: userId,
-        content: "yeah, i didn't love their last movie, though",
-        timestamp: new Date(Date.now() - 18 * 60 * 1000),
-        isOwn: true,
-      },
-    ];
-    setMessages(mockSeed);
-  }, [matchId, userId]);
+    fetch(`${SERVER_URL}/api/chats/${chatId}/messages`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        const loaded: Message[] = (data.messages ?? []).map((m: any) => ({
+          id: m.id,
+          senderId: m.senderId,
+          content: m.text,
+          timestamp: new Date(m.sentAt),
+          isOwn: m.senderId === userId,
+        }));
+        setMessages(loaded);
+      })
+      .catch(() => {});
+  }, [chatId]);   // only re-fetch when chat changes, not on every render
 
-  // ── WebSocket connection ─────────────────────────────────────────────────
+  // Socket.io connection
   useEffect(() => {
-    if (!matchId || !WS_URL) {
-      // WS_URL not configured yet — stay in mock/offline mode
-      setConnectionStatus("disconnected");
-      return;
-    }
+    if (!token || token.trim() === "") return;
+
+    // If socket already exists and is connected, don't create a new one
+    if (socketRef.current?.connected) return;
 
     setConnectionStatus("connecting");
 
-    const ws = new WebSocket(`${WS_URL}?matchId=${matchId}&userId=${userId}`);
-    wsRef.current = ws;
+    const socket = io(SERVER_URL, {
+      auth: { token },
+    });
+    socketRef.current = socket;
 
-    ws.onopen = () => {
+    socket.on("connect", () => {
       setConnectionStatus("connected");
-    };
+      if (chatId) socket.emit("join_chat", chatId);
+    });
 
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data as string);
+    socket.on("disconnect", () => setConnectionStatus("disconnected"));
+    socket.on("connect_error", () => setConnectionStatus("error"));
 
-        if (data.type === "message") {
-          const incoming: Message = {
-            id: data.id ?? crypto.randomUUID(),
-            senderId: data.senderId,
-            content: data.content,
-            timestamp: new Date(data.timestamp),
-            isOwn: data.senderId === userId,
+    socket.on("receive_message", (m: any) => {
+      setMessages((prev) => {
+        // Ignore if we already have this message
+        if (prev.some((msg) => msg.id === m.id)) return prev;
+        return [...prev, {
+          id: m.id,
+          senderId: m.senderId,
+          content: m.text,
+          timestamp: new Date(m.sentAt),
+          isOwn: false,
+        }];
+      });
+      onMessage?.({ id: m.id, senderId: m.senderId, content: m.text, timestamp: new Date(m.sentAt), isOwn: false });
+    });
+
+    socket.on("message_sent", (m: any) => {
+      setMessages((prev) => {
+        // Already have the real message, do nothing
+        if (prev.some((msg) => msg.id === m.id)) return prev;
+
+        // Replace the optimistic message with the confirmed one
+        const optimisticIndex = prev.findIndex(
+          (msg) => msg.isOwn && msg.content === m.text && msg.id !== m.id
+        );
+
+        if (optimisticIndex !== -1) {
+          const updated = [...prev];
+          updated[optimisticIndex] = {
+            id: m.id,
+            senderId: m.senderId,
+            content: m.text,
+            timestamp: new Date(m.sentAt),
+            isOwn: true,
           };
-          setMessages((prev) => [...prev, incoming]);
-          onMessage?.(incoming);
+          return updated;
         }
 
-        if (data.type === "typing") {
-          setIsTyping(true);
-          if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-          typingTimerRef.current = setTimeout(() => setIsTyping(false), 2000);
-        }
-      } catch {
-        // malformed frame — ignore
-      }
-    };
+        return [...prev, {
+          id: m.id,
+          senderId: m.senderId,
+          content: m.text,
+          timestamp: new Date(m.sentAt),
+          isOwn: true,
+        }];
+      });
+    });
 
-    ws.onerror = () => setConnectionStatus("error");
-    ws.onclose = () => setConnectionStatus("disconnected");
+    socket.on("typing", () => {
+      setIsTyping(true);
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = setTimeout(() => setIsTyping(false), 2000);
+    });
 
     return () => {
-      ws.close();
-      wsRef.current = null;
+      socket.disconnect();
+      socketRef.current = null;
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     };
-  }, [matchId, userId, onMessage]);
+  }, [token]);
 
-  // ── Send a message ───────────────────────────────────────────────────────
+  //Join new room when chatId changes
+  useEffect(() => {
+    if (chatId && socketRef.current?.connected) {
+      socketRef.current.emit("join_chat", chatId);
+    }
+  }, [chatId]);
+
+  // Sending a message
   const sendMessage = useCallback(
     (content: string) => {
-      if (!content.trim() || !matchId) return;
+      if (!content.trim() || !chatId || !socketRef.current) return;
 
-      const newMessage: Message = {
+      const optimistic: Message = {
         id: crypto.randomUUID(),
         senderId: userId,
         content: content.trim(),
         timestamp: new Date(),
         isOwn: true,
       };
+      setMessages((prev) => [...prev, optimistic]);
 
-      // Optimistic local update
-      setMessages((prev) => [...prev, newMessage]);
-
-      // Send over WebSocket when connected, otherwise queue for REST fallback
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(
-          JSON.stringify({
-            type: "message",
-            matchId,
-            senderId: userId,
-            content: content.trim(),
-            timestamp: newMessage.timestamp.toISOString(),
-          })
-        );
-      } else {
-        // TODO: replace with your REST endpoint when WS is not available
-        // fetch("/api/messages", { method: "POST", body: JSON.stringify({ matchId, content }) })
-      }
+      socketRef.current.emit("send_message", {
+        chatId,
+        text: content.trim(),
+      });
     },
-    [matchId, userId]
+    [chatId, userId]
   );
+
+  //Typing indicator
+  const sendTyping = useCallback(() => {
+    if (chatId && socketRef.current?.connected) {
+      socketRef.current.emit("typing", chatId);
+    }
+  }, [chatId]);
 
   return { messages, sendMessage, connectionStatus, isTyping };
 }

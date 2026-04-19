@@ -17,8 +17,6 @@ const Navbar: React.FC<NavbarProps> = ({ onSignOut }) => {
   const location = useLocation();
 
   const handleSignOut = () => {
-    // TODO: call your sign-out API endpoint here
-    // await fetch("/api/auth/signout", { method: "POST" });
     onSignOut?.();
   };
 
@@ -50,13 +48,15 @@ const Navbar: React.FC<NavbarProps> = ({ onSignOut }) => {
         ))}
       </ul>
 
-      <button
-        onClick={handleSignOut}
-        className="text-[0.8rem] text-[var(--color-text-secondary)] bg-transparent border border-[var(--color-border-strong)] rounded-md px-3.5 py-1.5 cursor-pointer shrink-0 transition-all duration-150 hover:text-[var(--color-text-primary)] hover:border-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
-        style={{ fontFamily: "var(--font-body)" }}
-      >
-        sign out
-      </button>
+      {onSignOut && (
+        <button
+          onClick={handleSignOut}
+          className="text-[0.8rem] text-[var(--color-text-secondary)] bg-transparent border border-[var(--color-border-strong)] rounded-md px-3.5 py-1.5 cursor-pointer shrink-0 transition-all duration-150 hover:text-[var(--color-text-primary)] hover:border-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
+          style={{ fontFamily: "var(--font-body)" }}
+        >
+          sign out
+        </button>
+      )}
     </nav>
   );
 };

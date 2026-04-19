@@ -1,0 +1,581 @@
+swagger: '2.0'
+info:
+  title: Hot Take Backend API
+  version: 1.0.0
+  description: |
+    Swagger 2.0 presentation version of the Hot Take backend API.
+
+    Replace the host, basePath, and schemes values with your deployed backend
+    before presenting in SwaggerHub or Swagger UI.
+host: localhost:3001
+basePath: /
+schemes:
+  - http
+consumes:
+  - application/json
+produces:
+  - application/json
+tags:
+  - name: Health
+  - name: Auth
+  - name: Profile
+  - name: Matches
+  - name: Chats
+securityDefinitions:
+  bearerAuth:
+    type: apiKey
+    name: Authorization
+    in: header
+    description: Use `Bearer <token>`.
+definitions:
+  ErrorResponse:
+    type: object
+    required:
+      - error
+    properties:
+      error:
+        type: string
+        example: Unauthorized.
+      details:
+        type: string
+        description: Present on unexpected server errors.
+        example: Database connection failed.
+  HealthResponse:
+    type: object
+    required:
+      - status
+    properties:
+      status:
+        type: string
+        example: ok
+  User:
+    type: object
+    required:
+      - id
+      - username
+      - email
+      - bio
+      - tags
+      - createdAt
+      - updatedAt
+    properties:
+      id:
+        type: string
+        example: user_a1b2c3d4
+      username:
+        type: string
+        example: testuser
+      email:
+        type: string
+        format: email
+        example: test@example.com
+      bio:
+        type: string
+        example: I want to debate whether modern horror is better than prestige drama.
+      tags:
+        type: array
+        items:
+          type: string
+        example:
+          - film
+          - horror
+          - tv
+      createdAt:
+        type: string
+        format: date-time
+        example: 2026-04-15T18:20:00.000Z
+      updatedAt:
+        type: string
+        format: date-time
+        example: 2026-04-15T18:20:00.000Z
+  AuthRegisterRequest:
+    type: object
+    required:
+      - username
+      - email
+      - password
+    properties:
+      username:
+        type: string
+        example: demo_user
+      email:
+        type: string
+        format: email
+        example: demo_user@example.com
+      password:
+        type: string
+        format: password
+        example: HotTake123!
+  AuthLoginRequest:
+    type: object
+    required:
+      - email
+      - password
+    properties:
+      email:
+        type: string
+        format: email
+        example: demo_user@example.com
+      password:
+        type: string
+        format: password
+        example: HotTake123!
+  AuthSuccessResponse:
+    type: object
+    required:
+      - token
+      - user
+    properties:
+      token:
+        type: string
+        example: 2ddbc58e-1122-4455-8899-4f21a3bf6e91
+      user:
+        $ref: '#/definitions/User'
+  CurrentUserResponse:
+    type: object
+    required:
+      - user
+    properties:
+      user:
+        $ref: '#/definitions/User'
+  UpdateInterestsRequest:
+    type: object
+    required:
+      - bio
+    properties:
+      bio:
+        type: string
+        example: I want to debate whether modern horror is better than prestige drama.
+      tags:
+        type: array
+        maxItems: 10
+        items:
+          type: string
+        example:
+          - film
+          - horror
+          - tv
+  UpdateInterestsResponse:
+    type: object
+    required:
+      - user
+    properties:
+      user:
+        $ref: '#/definitions/User'
+  Match:
+    type: object
+    required:
+      - userId
+      - username
+      - bio
+      - tags
+      - score
+      - sharedTags
+      - sharedTerms
+    properties:
+      userId:
+        type: string
+        example: user_9a8b7c6d
+      username:
+        type: string
+        example: cinemafan
+      bio:
+        type: string
+        example: Horror movies and long arguments about auteur theory are my thing.
+      tags:
+        type: array
+        items:
+          type: string
+        example:
+          - film
+          - horror
+          - criticism
+      score:
+        type: integer
+        minimum: 0
+        maximum: 99
+        example: 84
+      sharedTags:
+        type: array
+        items:
+          type: string
+        example:
+          - film
+          - horror
+      sharedTerms:
+        type: array
+        items:
+          type: string
+        example:
+          - debate
+          - modern
+  MatchListResponse:
+    type: object
+    required:
+      - matches
+    properties:
+      matches:
+        type: array
+        items:
+          $ref: '#/definitions/Match'
+  StartChatResponse:
+    type: object
+    required:
+      - chatId
+    properties:
+      chatId:
+        type: string
+        example: chat_1234abcd
+  Message:
+    type: object
+    required:
+      - id
+      - senderId
+      - text
+      - sentAt
+    properties:
+      id:
+        type: string
+        example: msg_5678efgh
+      senderId:
+        type: string
+        example: user_a1b2c3d4
+      text:
+        type: string
+        example: "Hot take: modern horror is carrying television right now."
+      sentAt:
+        type: string
+        format: date-time
+        example: 2026-04-15T18:40:00.000Z
+  ChatSummary:
+    type: object
+    required:
+      - id
+      - participant
+      - matchScore
+      - sharedTags
+      - lastMessage
+    properties:
+      id:
+        type: string
+        example: chat_1234abcd
+      participant:
+        $ref: '#/definitions/User'
+        x-nullable: true
+      matchScore:
+        type: integer
+        minimum: 0
+        maximum: 99
+        example: 84
+      sharedTags:
+        type: array
+        items:
+          type: string
+        example:
+          - film
+          - horror
+      lastMessage:
+        $ref: '#/definitions/Message'
+        x-nullable: true
+  ChatListResponse:
+    type: object
+    required:
+      - chats
+    properties:
+      chats:
+        type: array
+        items:
+          $ref: '#/definitions/ChatSummary'
+  ChatMessagesResponse:
+    type: object
+    required:
+      - messages
+    properties:
+      messages:
+        type: array
+        items:
+          $ref: '#/definitions/Message'
+  SendMessageRequest:
+    type: object
+    required:
+      - text
+    properties:
+      text:
+        type: string
+        example: I disagree, prestige drama still clears.
+  SendMessageResponse:
+    type: object
+    required:
+      - message
+    properties:
+      message:
+        $ref: '#/definitions/Message'
+paths:
+  /api/health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      operationId: getHealth
+      responses:
+        200:
+          description: Backend is running
+          schema:
+            $ref: '#/definitions/HealthResponse'
+  /api/auth/register:
+    post:
+      tags:
+        - Auth
+      summary: Register a new user
+      operationId: registerUser
+      parameters:
+        - in: body
+          name: registerItem
+          description: Registration payload
+          required: true
+          schema:
+            $ref: '#/definitions/AuthRegisterRequest'
+      responses:
+        201:
+          description: User created successfully
+          schema:
+            $ref: '#/definitions/AuthSuccessResponse'
+        400:
+          description: Missing required fields
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        409:
+          description: Email already exists
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        500:
+          description: Unexpected server error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Login with email and password
+      operationId: loginUser
+      parameters:
+        - in: body
+          name: loginItem
+          description: Login payload
+          required: true
+          schema:
+            $ref: '#/definitions/AuthLoginRequest'
+      responses:
+        200:
+          description: Login successful
+          schema:
+            $ref: '#/definitions/AuthSuccessResponse'
+        400:
+          description: Missing required fields
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        401:
+          description: Invalid credentials
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        500:
+          description: Unexpected server error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/me:
+    get:
+      tags:
+        - Profile
+      summary: Get the currently authenticated user
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Current user
+          schema:
+            $ref: '#/definitions/CurrentUserResponse'
+        401:
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        500:
+          description: Unexpected server error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/interests:
+    put:
+      tags:
+        - Profile
+      summary: Save the authenticated user's bio and tags
+      operationId: updateInterests
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: body
+          name: interestsItem
+          description: Interests payload
+          required: true
+          schema:
+            $ref: '#/definitions/UpdateInterestsRequest'
+      responses:
+        200:
+          description: Interests updated
+          schema:
+            $ref: '#/definitions/UpdateInterestsResponse'
+        400:
+          description: Invalid request body
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        401:
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        500:
+          description: Unexpected server error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/matches:
+    get:
+      tags:
+        - Matches
+      summary: List potential matches for the authenticated user
+      operationId: listMatches
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Match results
+          schema:
+            $ref: '#/definitions/MatchListResponse'
+        401:
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        500:
+          description: Unexpected server error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/matches/{matchUserId}/start-chat:
+    post:
+      tags:
+        - Matches
+      summary: Start a chat with a matched user
+      operationId: startChat
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: matchUserId
+          in: path
+          description: ID of the matched user
+          required: true
+          type: string
+      responses:
+        201:
+          description: Chat created, or existing chat returned
+          schema:
+            $ref: '#/definitions/StartChatResponse'
+        401:
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        404:
+          description: Matched user not found
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        500:
+          description: Unexpected server error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/chats:
+    get:
+      tags:
+        - Chats
+      summary: List chats for the authenticated user
+      operationId: listChats
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Chat summaries
+          schema:
+            $ref: '#/definitions/ChatListResponse'
+        401:
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        500:
+          description: Unexpected server error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/chats/{chatId}/messages:
+    get:
+      tags:
+        - Chats
+      summary: Get messages for a specific chat
+      operationId: getChatMessages
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: chatId
+          in: path
+          description: Chat ID
+          required: true
+          type: string
+      responses:
+        200:
+          description: Messages in the chat
+          schema:
+            $ref: '#/definitions/ChatMessagesResponse'
+        401:
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        404:
+          description: Chat not found
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        500:
+          description: Unexpected server error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+    post:
+      tags:
+        - Chats
+      summary: Send a message in a specific chat
+      operationId: sendMessage
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: chatId
+          in: path
+          description: Chat ID
+          required: true
+          type: string
+        - in: body
+          name: messageItem
+          description: Message payload
+          required: true
+          schema:
+            $ref: '#/definitions/SendMessageRequest'
+      responses:
+        201:
+          description: Message sent
+          schema:
+            $ref: '#/definitions/SendMessageResponse'
+        400:
+          description: Missing required text
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        401:
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        404:
+          description: Chat not found
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        500:
+          description: Unexpected server error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
