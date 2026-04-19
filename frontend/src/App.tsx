@@ -2,6 +2,7 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import MatchesPage from "./pages/MatchesPage";
+import InterestsPage from "./pages/InterestsPage";
 import "./index.css";
 
 const PlaceholderPage: React.FC<{ title: string }> = ({ title }) => (
@@ -34,7 +35,7 @@ const App: React.FC = () => {
       <Routes>
         <Route path="/" element={<PlaceholderPage title="home" />} />
         <Route path="/how-it-works" element={<PlaceholderPage title="how it works" />} />
-        <Route path="/interests" element={<PlaceholderPage title="interests" />} />
+        <Route path="/interests" element={<InterestsPage />} />
         <Route path="/matches" element={<MatchesPage />} />
         <Route path="/chat" element={<Navigate to="/matches" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
