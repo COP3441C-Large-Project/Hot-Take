@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -17,11 +18,13 @@ class AuthApiException implements Exception {
 }
 
 class AuthApi {
+  static const Duration _requestTimeout = Duration(seconds: 10);
+
   final String baseUrl;
   final http.Client _client;
 
   AuthApi({String? baseUrl, http.Client? client})
-      : baseUrl = baseUrl ?? _defaultBaseUrl(),
+      : baseUrl = _resolveBaseUrl(baseUrl),
         _client = client ?? http.Client();
 
   Future<AuthSession> login({
@@ -47,11 +50,13 @@ class AuthApi {
   }
 
   Future<AuthUser> me(String token) async {
-    final response = await _client.get(
-      Uri.parse('$baseUrl/api/me'),
-      headers: {
-        'Authorization': 'Bearer $token',
-      },
+    final response = await _timedRequest(
+      () => _client.get(
+        Uri.parse('$baseUrl/api/me'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ),
     );
 
     final payload = _decodePayload(response);
@@ -63,12 +68,14 @@ class AuthApi {
   }
 
   Future<AuthSession> _postSession(String path, Map<String, dynamic> body) async {
-    final response = await _client.post(
-      Uri.parse('$baseUrl$path'),
-      headers: const {
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(body),
+    final response = await _timedRequest(
+      () => _client.post(
+        Uri.parse('$baseUrl$path'),
+        headers: const {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(body),
+      ),
     );
 
     final payload = _decodePayload(response);
@@ -84,9 +91,13 @@ class AuthApi {
       return const <String, dynamic>{};
     }
 
-    final decoded = jsonDecode(response.body);
-    if (decoded is Map<String, dynamic>) {
-      return decoded;
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } on FormatException {
+      return const <String, dynamic>{};
     }
 
     return const <String, dynamic>{};
@@ -97,17 +108,35 @@ class AuthApi {
   }
 
   Future<void> sendVerificationEmail(String userId) async {
-  final response = await _client.post(
-    Uri.parse('$baseUrl/api/auth/send-verification'),
-    headers: const {'Content-Type': 'application/json'},
-    body: jsonEncode({'userId': userId}),
-  );
+    final response = await _timedRequest(
+      () => _client.post(
+        Uri.parse('$baseUrl/api/auth/send-verification'),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({'userId': userId}),
+      ),
+    );
 
-  if (response.statusCode < 200 || response.statusCode >= 300) {
-    final payload = _decodePayload(response);
-    throw AuthApiException(response.statusCode, _messageFromPayload(payload));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final payload = _decodePayload(response);
+      throw AuthApiException(response.statusCode, _messageFromPayload(payload));
+    }
   }
-}
+
+  static String _resolveBaseUrl(String? baseUrl) {
+    final value = baseUrl ?? _defaultBaseUrl();
+    final uri = Uri.tryParse(value);
+    if (uri == null || uri.host.isEmpty) {
+      throw ArgumentError('Invalid API base URL.');
+    }
+
+    final isHttp = uri.scheme == 'http';
+    final isLocal = _isLocalHost(uri.host);
+    if (isHttp && (kReleaseMode || !isLocal)) {
+      throw ArgumentError('Insecure API base URL is not allowed.');
+    }
+
+    return value;
+  }
 
   static String _defaultBaseUrl() {
     const override = String.fromEnvironment('API_BASE_URL');
@@ -134,6 +163,19 @@ class AuthApi {
         return 'http://127.0.0.1:3001';
       default:
         return 'http://167.99.155.122:3001';
+    }
+  }
+
+  static bool _isLocalHost(String host) {
+    final normalized = host.toLowerCase();
+    return normalized == 'localhost' || normalized == '127.0.0.1' || normalized == '10.0.2.2';
+  }
+
+  Future<http.Response> _timedRequest(Future<http.Response> Function() request) async {
+    try {
+      return await request().timeout(_requestTimeout);
+    } on TimeoutException {
+      throw const AuthApiException(408, 'Request timed out.');
     }
   }
 }
