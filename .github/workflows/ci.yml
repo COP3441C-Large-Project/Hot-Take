@@ -51,7 +51,13 @@ jobs:
 
       - name: Install dependencies
         working-directory: backend
-        run: npm ci
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            echo "backend/package-lock.json not found; falling back to npm install"
+            npm install
+          fi
 
       # Add "test" script to backend/package.json and this step will run it automatically.
       - name: Run tests (if defined)
