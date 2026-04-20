@@ -1,23 +1,24 @@
 import React from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+// Adjust this path to wherever your AuthContext/Provider file lives
+import { useAuth } from "../../hooks/useAuth"; 
 
 const NAV_LINKS = [
-  { label: "home", href: "/" },
-  { label: "how it works", href: "/how-it-works" },
-  { label: "interests", href: "/interests" },
-  { label: "matches", href: "/matches" },
-  { label: "chat", href: "/chat" },
+  { label: "home", href: "/", protected: false },
+  { label: "interests", href: "/interests", protected: true },
+  { label: "matches", href: "/matches", protected: true },
+  { label: "chat", href: "/chat", protected: true },
 ];
 
-interface NavbarProps {
-  onSignOut?: () => void;
-}
-
-const Navbar: React.FC<NavbarProps> = ({ onSignOut }) => {
+const Navbar: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout, isAuthenticated } = useAuth();
 
-  const handleSignOut = () => {
-    onSignOut?.();
+  const handleSignOut = (e: React.MouseEvent) => {
+    e.preventDefault();
+    logout();      // Clears the token/state
+    navigate("/"); // Forces the screen to move to home/login
   };
 
   return (
@@ -31,26 +32,33 @@ const Navbar: React.FC<NavbarProps> = ({ onSignOut }) => {
       </Link>
 
       <ul className="flex list-none gap-1 flex-1 m-0 p-0">
-        {NAV_LINKS.map((link) => (
-          <li key={link.href}>
-            <Link
-              to={link.href}
-              className={`text-sm px-3 py-1.5 rounded-md no-underline transition-colors duration-150 ${
-                location.pathname === link.href
-                  ? "text-[var(--color-accent-red)]"
-                  : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
-              }`}
-              style={{ fontFamily: "var(--font-body)" }}
-            >
-              {link.label}
-            </Link>
-          </li>
-        ))}
+        {NAV_LINKS.map((link) => {
+          // Hide protected links if the user isn't logged in
+          if (link.protected && !isAuthenticated) return null;
+
+          return (
+            <li key={link.href}>
+              <Link
+                to={link.href}
+                className={`text-sm px-3 py-1.5 rounded-md no-underline transition-colors duration-150 ${
+                  location.pathname === link.href
+                    ? "text-[var(--color-accent-red)]"
+                    : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
+                }`}
+                style={{ fontFamily: "var(--font-body)" }}
+              >
+                {link.label}
+              </Link>
+            </li>
+          );
+        })}
       </ul>
 
-      {onSignOut && (
+      {/* Only show sign out button if authenticated */}
+      {isAuthenticated && (
         <button
           onClick={handleSignOut}
+          type="button"
           className="text-[0.8rem] text-[var(--color-text-secondary)] bg-transparent border border-[var(--color-border-strong)] rounded-md px-3.5 py-1.5 cursor-pointer shrink-0 transition-all duration-150 hover:text-[var(--color-text-primary)] hover:border-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
           style={{ fontFamily: "var(--font-body)" }}
         >
