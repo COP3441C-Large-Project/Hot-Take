@@ -18,7 +18,7 @@ interface UseChatReturn {
   isTyping: boolean;
 }
 
-const SERVER_URL = "http://localhost:3001";
+const SERVER_URL = import.meta.env.VITE_API_URL;
 
 export function useChat({ chatId, token, userId, onMessage }: UseChatOptions): UseChatReturn {
   const [messages, setMessages] = useState<Message[]>([]);
