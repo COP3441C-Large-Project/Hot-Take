@@ -154,6 +154,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ activeTab, onTabChange }) => {
                         <label className="mb-2 block text-[10px] font-light uppercase tracking-[0.2em] text-[#888780]">PASSWORD</label>
                         <input
                             type="password"
+                            aria-label="Password"
                             value={password}
                             onChange={(event) => {
                                 resetAuthErrors();
@@ -168,6 +169,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ activeTab, onTabChange }) => {
                             <label className="mb-2 block text-[10px] font-light uppercase tracking-[0.2em] text-[#888780]">CONFIRM PASSWORD</label>
                             <input
                                 type="password"
+                                aria-label="Confirm password"
                                 value={confirmPassword}
                                 onChange={(event) => {
                                     resetAuthErrors();
@@ -185,7 +187,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ activeTab, onTabChange }) => {
                     <button
                         type="submit"
                         disabled={isLoading}
-                        className="mt-4 w-full rounded-full bg-[#E24B4A] px-4 py-3 text-sm font-normal lowercase text-white transition hover:bg-[#E24B4A] hover:text-white hover:shadow-[0_6px_0_#4A1B0C] active:bg-white active:text-black active:translate-y-[1px]"
+                        className="mt-4 w-full rounded-full bg-[#B23533] px-4 py-3 text-sm font-normal lowercase text-white transition hover:bg-[#972B2A] hover:text-white hover:shadow-[0_6px_0_#4A1B0C] active:bg-white active:text-black active:translate-y-[1px]"
                     >
                         {isLoading ? "working..." : submitLabel}
                     </button>
