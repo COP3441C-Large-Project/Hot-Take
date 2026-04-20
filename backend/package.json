@@ -4,11 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-<<<<<<< Updated upstream
     "dev": "node --watch --env-file=.env src/server.js",
-=======
-    "dev": "node --env-file=.env --watch src/server.js",
->>>>>>> Stashed changes
     "start": "node --env-file=.env src/server.js"
   },
   "dependencies": {
