@@ -10,8 +10,14 @@ class AuthSession {
   });
 
   factory AuthSession.fromJson(Map<String, dynamic> json) {
+    final rawToken = json['token'];
+    final token = rawToken is String ? rawToken.trim() : '';
+    if (token.isEmpty) {
+      throw const FormatException('Missing auth token.');
+    }
+
     return AuthSession(
-      token: json['token'] as String? ?? '',
+      token: token,
       user: AuthUser.fromJson(json['user'] as Map<String, dynamic>? ?? const <String, dynamic>{}),
     );
   }

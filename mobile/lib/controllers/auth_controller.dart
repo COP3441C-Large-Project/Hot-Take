@@ -33,14 +33,16 @@ class AuthController extends ChangeNotifier {
   String? get error => _error;
   bool get isBusy => _isBusy;
   bool get isRestoring => _isRestoring;
-  bool get isAuthenticated => _user != null && _token != null;
+  bool get isAuthenticated => _user != null && (_token?.isNotEmpty ?? false);
 
   Future<void> restoreSession() async {
     _isRestoring = true;
     notifyListeners();
 
+    String? storedToken;
+
     try {
-      final storedToken = _tokenStore.readToken();
+      storedToken = _tokenStore.readToken();
       if (storedToken == null || storedToken.isEmpty) {
         _clearSession();
         return;
@@ -54,8 +56,9 @@ class AuthController extends ChangeNotifier {
       await _tokenStore.clear();
       _clearSession();
     } catch (_) {
-      _clearSession();
-      _error = null;
+      _user = null;
+      _token = storedToken;
+      _error = 'Unable to restore session right now.';
     } finally {
       _isRestoring = false;
       notifyListeners();
