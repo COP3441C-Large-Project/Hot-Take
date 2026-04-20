@@ -2,6 +2,7 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import MatchesPage from "./pages/MatchesPage";
+import InterestsPage from "./pages/InterestsPage";
 import AuthPage from "./pages/AuthPage";
 import { useAuth } from "./hooks/useAuth";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
@@ -54,30 +55,9 @@ const App: React.FC = () => {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/" element={<AuthPage />} />
         <Route path="/how-it-works" element={<PlaceholderPage title="how it works" />} />
-        <Route
-          path="/interests"
-          element={(
-            <ProtectedRoute>
-              <PlaceholderPage title="interests" />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="/matches"
-          element={(
-            <ProtectedRoute>
-              <MatchesPage />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="/chat"
-          element={(
-            <ProtectedRoute>
-              <Navigate to="/matches" replace />
-            </ProtectedRoute>
-          )}
-        />
+        <Route path="/interests" element={<InterestsPage />} />
+        <Route path="/matches" element={<MatchesPage />} />
+        <Route path="/chat" element={<Navigate to="/matches" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       
       </Routes>
