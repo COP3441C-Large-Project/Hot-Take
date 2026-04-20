@@ -248,40 +248,43 @@ const AuthForm: React.FC<AuthFormProps> = ({ activeTab, onTabChange }) => {
             </div>
           )}
 
-          <div>
-            <label className="mb-2 block text-[10px] font-light uppercase tracking-[0.2em] text-[#888780]">PASSWORD</label>
-            <input type="password" value={password}
-              onChange={(e) => { resetAll(); setPassword(e.target.value); }}
-              className="w-full rounded-lg border border-[#D3D1C7] bg-[#F7F7F5] px-4 py-3 text-[#888780] outline-none transition placeholder:text-[#888780] focus:border-[#EF9F27]"
-            />
-          </div>
+                    <div>
+                        <label className="mb-2 block text-[10px] font-light uppercase tracking-[0.2em] text-[#888780]">PASSWORD</label>
+                        <input
+                            type="password"
+                            value={password}
+                            onChange={(event) => {
+                                resetAuthErrors();
+                                setPassword(event.target.value);
+                            }}
+                            className="w-full rounded-lg border border-[#D3D1C7] bg-[#F7F7F5] px-4 py-3 text-[#888780] outline-none transition placeholder:text-[#888780] focus:border-[#EF9F27]"
+                        />
+                    </div>
 
-          {activeTab === "register" && (
-            <div>
-              <label className="mb-2 block text-[10px] font-light uppercase tracking-[0.2em] text-[#888780]">CONFIRM PASSWORD</label>
-              <input type="password" value={confirmPassword}
-                onChange={(e) => { resetAll(); setConfirmPassword(e.target.value); }}
-                className="w-full rounded-lg border border-[#D3D1C7] bg-[#F7F7F5] px-4 py-3 text-[#888780] outline-none transition placeholder:text-[#888780] focus:border-[#EF9F27]"
-              />
-            </div>
-          )}
+                    {activeTab === "register" && (
+                        <div>
+                            <label className="mb-2 block text-[10px] font-light uppercase tracking-[0.2em] text-[#888780]">CONFIRM PASSWORD</label>
+                            <input
+                                type="password"
+                                value={confirmPassword}
+                                onChange={(event) => {
+                                    resetAuthErrors();
+                                    setConfirmPassword(event.target.value);
+                                }}
+                                className="w-full rounded-lg border border-[#D3D1C7] bg-[#F7F7F5] px-4 py-3 text-[#888780] outline-none transition placeholder:text-[#888780] focus:border-[#EF9F27]"
+                            />
+                        </div>
+                    )}
 
           {(formError || error) && <p className="text-sm text-[#B02A2A]">{formError ?? error}</p>}
 
-          <button type="submit" disabled={isLoading}
-            className="mt-4 w-full rounded-full bg-[#E24B4A] px-4 py-3 text-sm font-normal lowercase text-white transition hover:bg-[#E24B4A] hover:text-white hover:shadow-[0_6px_0_#4A1B0C] active:bg-white active:text-black active:translate-y-[1px]"
-          >
-            {isLoading ? "working..." : submitLabel}
-          </button>
-
-          {activeTab === "login" && (
-            <button type="button"
-              className="w-full text-center text-xs text-[#888780] underline hover:text-black transition"
-              onClick={() => { resetAll(); setView("forgot"); }}
-            >
-              forgot password?
-            </button>
-          )}
+                    <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="mt-4 w-full rounded-full bg-[#E24B4A] px-4 py-3 text-sm font-normal lowercase text-white transition hover:bg-[#E24B4A] hover:text-white hover:shadow-[0_6px_0_#4A1B0C] active:bg-white active:text-black active:translate-y-[1px]"
+                    >
+                        {isLoading ? "working..." : submitLabel}
+                    </button>
 
           <p className="mt-auto pt-8 text-center text-xs italic lowercase text-[#888780]">
             your identity is never shared with matches

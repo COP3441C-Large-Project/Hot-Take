@@ -15,7 +15,7 @@ const AuthPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-white flex">
-      <div className="w-[35%] shrink-0 min-h-screen bg-[#E24B4A] flex flex-col justify-between">
+      <aside className="w-[35%] shrink-0 min-h-screen bg-[#B23533] flex flex-col justify-between" aria-label="About Hot Take">
         <div className="px-8 pt-12 text-white text-left flex flex-col gap-5">
           <div className="leading-[0.88]">
             <h1 className="text-7xl lowercase">hot</h1>
@@ -54,9 +54,11 @@ const AuthPage: React.FC = () => {
           </button>
           <p className="text-[#4A1B0C] italic text-xs font-light mt-3 opacity-80">hot take · interest-based matchmaking</p>
         </div>
-      </div>
+      </aside>
 
-      <AuthForm activeTab={activeTab} onTabChange={setActiveTab} />
+      <main className="flex-1" aria-label="Authentication">
+        <AuthForm activeTab={activeTab} onTabChange={setActiveTab} />
+      </main>
     </div>
   );
 };

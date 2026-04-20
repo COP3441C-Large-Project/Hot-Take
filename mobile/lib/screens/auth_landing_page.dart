@@ -1,10 +1,23 @@
-import 'package:flutter/material.dart';
 import 'dart:convert';
+
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 
 import '../controllers/auth_controller.dart';
 
 enum AuthMode { login, register }
+enum _AuthStage { landing, form, forgot, forgotSent }
+
+class _HotTakePalette {
+  static const red = Color(0xFFE24B4A);
+  static const orange = Color(0xFFEF9F27);
+  static const brown = Color(0xFF4A1B0C);
+  static const page = Color(0xFFF7F5F2);
+  static const ink = Color(0xFF1A1714);
+  static const muted = Color(0xFF888780);
+  static const border = Color(0xFFD9D4CC);
+}
 
 class AuthLandingPage extends StatefulWidget {
   final AuthController controller;
@@ -20,12 +33,12 @@ class _AuthLandingPageState extends State<AuthLandingPage> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
   final TextEditingController _forgotEmailController = TextEditingController();
 
   AuthMode _mode = AuthMode.login;
-  bool _showForgot = false;
-  bool _showForgotSent = false;
+  _AuthStage _stage = _AuthStage.landing;
   bool _isSendingReset = false;
   String? _forgotError;
 
@@ -39,8 +52,20 @@ class _AuthLandingPageState extends State<AuthLandingPage> {
     super.dispose();
   }
 
+  void _openForm(AuthMode mode) {
+    setState(() {
+      _mode = mode;
+      _stage = _AuthStage.form;
+      _forgotError = null;
+    });
+    _formKey.currentState?.reset();
+    widget.controller.clearError();
+  }
+
   void _setMode(AuthMode mode) {
-    if (_mode == mode) return;
+    if (_mode == mode) {
+      return;
+    }
     setState(() => _mode = mode);
     _formKey.currentState?.reset();
     widget.controller.clearError();
@@ -48,7 +73,10 @@ class _AuthLandingPageState extends State<AuthLandingPage> {
 
   Future<void> _submit() async {
     FocusManager.instance.primaryFocus?.unfocus();
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
+
     widget.controller.clearError();
 
     if (_mode == AuthMode.login) {
@@ -56,13 +84,14 @@ class _AuthLandingPageState extends State<AuthLandingPage> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
-    } else {
-      await widget.controller.register(
-        username: _usernameController.text.trim(),
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
+      return;
     }
+
+    await widget.controller.register(
+      username: _usernameController.text.trim(),
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+    );
   }
 
   Future<void> _sendForgotPassword() async {
@@ -87,7 +116,7 @@ class _AuthLandingPageState extends State<AuthLandingPage> {
       if (body['error'] != null) {
         setState(() => _forgotError = body['error'] as String);
       } else {
-        setState(() => _showForgotSent = true);
+        setState(() => _stage = _AuthStage.forgotSent);
       }
     } catch (_) {
       setState(() => _forgotError = 'Unable to send reset email right now.');
@@ -98,106 +127,437 @@ class _AuthLandingPageState extends State<AuthLandingPage> {
 
   @override
   Widget build(BuildContext context) {
-    // ── Forgot password sent ─────────────────────────────────────────────────
-    if (_showForgotSent) {
-      return _ForgotSentScreen(
-        email: _forgotEmailController.text.trim(),
-        onBack: () => setState(() {
-          _showForgotSent = false;
-          _showForgot = false;
-          _forgotEmailController.clear();
-        }),
-      );
+    switch (_stage) {
+      case _AuthStage.landing:
+        return _LandingHeroScreen(
+          onSignIn: () => _openForm(AuthMode.login),
+          onSignUp: () => _openForm(AuthMode.register),
+        );
+      case _AuthStage.form:
+        return _AuthFormScreen(
+          mode: _mode,
+          controller: widget.controller,
+          formKey: _formKey,
+          usernameController: _usernameController,
+          emailController: _emailController,
+          passwordController: _passwordController,
+          confirmPasswordController: _confirmPasswordController,
+          onModeChanged: _setMode,
+          onSubmit: _submit,
+          onForgotPassword: () => setState(() {
+            _forgotError = null;
+            _stage = _AuthStage.forgot;
+          }),
+          onBack: () => setState(() => _stage = _AuthStage.landing),
+        );
+      case _AuthStage.forgot:
+        return _ForgotScreen(
+          emailController: _forgotEmailController,
+          error: _forgotError,
+          isSending: _isSendingReset,
+          onSend: _sendForgotPassword,
+          onBack: () => setState(() {
+            _forgotError = null;
+            _stage = _AuthStage.form;
+          }),
+        );
+      case _AuthStage.forgotSent:
+        return _ForgotSentScreen(
+          email: _forgotEmailController.text.trim(),
+          onBack: () => setState(() {
+            _forgotError = null;
+            _forgotEmailController.clear();
+            _stage = _AuthStage.form;
+          }),
+        );
     }
+  }
+}
 
-    // ── Forgot password form ─────────────────────────────────────────────────
-    if (_showForgot) {
-      return _ForgotScreen(
-        emailController: _forgotEmailController,
-        error: _forgotError,
-        isSending: _isSendingReset,
-        onSend: _sendForgotPassword,
-        onBack: () => setState(() {
-          _showForgot = false;
-          _forgotError = null;
-        }),
-      );
-    }
+class _LandingHeroScreen extends StatelessWidget {
+  final VoidCallback onSignIn;
+  final VoidCallback onSignUp;
 
-    // ── Main auth screen ─────────────────────────────────────────────────────
-    final width = MediaQuery.sizeOf(context).width;
-    final isWide = width >= 900;
+  const _LandingHeroScreen({required this.onSignIn, required this.onSignUp});
 
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F5F2),
-      resizeToAvoidBottomInset: true,
+      backgroundColor: _HotTakePalette.red,
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: isWide
-                    ? Row(
-                        children: [
-                          Expanded(
-                            child: _BrandPanel(
-                              compact: false,
-                              onSignIn: () => _setMode(AuthMode.login),
-                            ),
-                          ),
-                          Expanded(
-                            child: _AuthPanel(
-                              mode: _mode,
-                              controller: widget.controller,
-                              formKey: _formKey,
-                              usernameController: _usernameController,
-                              emailController: _emailController,
-                              passwordController: _passwordController,
-                              confirmPasswordController: _confirmPasswordController,
-                              onModeChanged: _setMode,
-                              onSubmit: _submit,
-                              onForgotPassword: () => setState(() {
-                                _showForgot = true;
-                                _forgotError = null;
-                              }),
-                            ),
-                          ),
-                        ],
-                      )
-                    : Column(
-                        children: [
-                          _BrandPanel(
-                            compact: true,
-                            onSignIn: () => _setMode(AuthMode.login),
-                          ),
-                          _AuthPanel(
-                            mode: _mode,
-                            controller: widget.controller,
-                            formKey: _formKey,
-                            usernameController: _usernameController,
-                            emailController: _emailController,
-                            passwordController: _passwordController,
-                            confirmPasswordController: _confirmPasswordController,
-                            onModeChanged: _setMode,
-                            onSubmit: _submit,
-                            onForgotPassword: () => setState(() {
-                              _showForgot = true;
-                              _forgotError = null;
-                            }),
-                          ),
-                        ],
+        child: Column(
+          children: [
+            Expanded(
+              flex: 5,
+              child: Container(
+                width: double.infinity,
+                color: _HotTakePalette.red,
+                padding: const EdgeInsets.fromLTRB(26, 28, 26, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'hot\ntake.',
+                      style: GoogleFonts.dmMono(
+                        color: Colors.white,
+                        fontSize: 68,
+                        height: 0.88,
+                        fontWeight: FontWeight.w400,
                       ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'match based on shared interests.',
+                      style: GoogleFonts.dmMono(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 15,
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      '────────────────────',
+                      style: GoogleFonts.dmMono(
+                        color: Colors.white.withValues(alpha: 0.55),
+                        fontSize: 10,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    const _Quip(
+                      title: 'No Profiles',
+                      body: 'anonymous by default',
+                    ),
+                    const SizedBox(height: 12),
+                    const _Quip(
+                      title: 'ML Matched',
+                      body: 'by shared interests, not looks',
+                    ),
+                    const SizedBox(height: 12),
+                    const _Quip(
+                      title: 'Low Commitment',
+                      body: "talk when you want. leave when you don't.",
+                    ),
+                  ],
+                ),
               ),
-            );
-          },
+            ),
+            Expanded(
+              flex: 4,
+              child: Container(
+                width: double.infinity,
+                color: _HotTakePalette.orange,
+                padding: const EdgeInsets.fromLTRB(26, 24, 26, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'ALREADY HAVE AN ACCOUNT?',
+                      style: GoogleFonts.dmMono(
+                        color: _HotTakePalette.brown,
+                        fontSize: 11,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _HoverActionButton(
+                      label: 'sign in',
+                      backgroundColor: _HotTakePalette.brown,
+                      textColor: _HotTakePalette.orange,
+                      onTap: onSignIn,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'NEW USER?',
+                      style: GoogleFonts.dmMono(
+                        color: _HotTakePalette.brown,
+                        fontSize: 11,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _HoverActionButton(
+                      label: 'sign up',
+                      backgroundColor: Colors.white,
+                      textColor: _HotTakePalette.brown,
+                      onTap: onSignUp,
+                    ),
+                    const Spacer(),
+                    Center(
+                      child: Text(
+                        'hot take · interest-based matchmaking',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.dmMono(
+                          color: _HotTakePalette.brown.withValues(alpha: 0.75),
+                          fontSize: 11,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// ── Forgot password form screen ──────────────────────────────────────────────
+class _Quip extends StatelessWidget {
+  final String title;
+  final String body;
+
+  const _Quip({required this.title, required this.body});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: GoogleFonts.dmMono(
+            color: Colors.white.withValues(alpha: 0.76),
+            fontSize: 11,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          body,
+          style: GoogleFonts.dmMono(
+            color: Colors.white,
+            fontSize: 14,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AuthFormScreen extends StatelessWidget {
+  final AuthMode mode;
+  final AuthController controller;
+  final GlobalKey<FormState> formKey;
+  final TextEditingController usernameController;
+  final TextEditingController emailController;
+  final TextEditingController passwordController;
+  final TextEditingController confirmPasswordController;
+  final ValueChanged<AuthMode> onModeChanged;
+  final Future<void> Function() onSubmit;
+  final VoidCallback onForgotPassword;
+  final VoidCallback onBack;
+
+  const _AuthFormScreen({
+    required this.mode,
+    required this.controller,
+    required this.formKey,
+    required this.usernameController,
+    required this.emailController,
+    required this.passwordController,
+    required this.confirmPasswordController,
+    required this.onModeChanged,
+    required this.onSubmit,
+    required this.onForgotPassword,
+    required this.onBack,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isLogin = mode == AuthMode.login;
+
+    return Scaffold(
+      backgroundColor: _HotTakePalette.page,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: _HotTakePalette.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    GestureDetector(
+                      onTap: onBack,
+                      child: Text(
+                        '← back',
+                        style: GoogleFonts.dmMono(
+                          color: _HotTakePalette.muted,
+                          fontSize: 13,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      isLogin ? 'sign in' : 'create account',
+                      style: GoogleFonts.dmMono(
+                        color: _HotTakePalette.ink,
+                        fontSize: 30,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _ModeTabs(mode: mode, onModeChanged: onModeChanged),
+                    const SizedBox(height: 20),
+                    Form(
+                      key: formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (!isLogin) ...[
+                            _LabeledField(
+                              label: 'USERNAME',
+                              controller: usernameController,
+                              onChanged: controller.clearError,
+                              validator: (value) =>
+                                  (value == null || value.trim().isEmpty)
+                                      ? 'Username is required.'
+                                      : null,
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                          _LabeledField(
+                            label: 'EMAIL',
+                            controller: emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            onChanged: controller.clearError,
+                            validator: (value) {
+                              final email = value?.trim() ?? '';
+                              if (email.isEmpty) {
+                                return 'Email is required.';
+                              }
+                              final emailPattern =
+                                  RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+                              if (!emailPattern.hasMatch(email)) {
+                                return 'Enter a valid email address.';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          _LabeledField(
+                            label: 'PASSWORD',
+                            controller: passwordController,
+                            obscureText: true,
+                            onChanged: controller.clearError,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Password is required.';
+                              }
+                              if (!isLogin) {
+                                if (value.length < 8) {
+                                  return 'Password must be at least 8 characters.';
+                                }
+                                final hasLetter =
+                                    RegExp(r'[A-Za-z]').hasMatch(value);
+                                final hasNumber = RegExp(r'\d').hasMatch(value);
+                                if (!hasLetter || !hasNumber) {
+                                  return 'Password must include letters and numbers.';
+                                }
+                              }
+                              return null;
+                            },
+                          ),
+                          if (!isLogin) ...[
+                            const SizedBox(height: 12),
+                            _LabeledField(
+                              label: 'CONFIRM PASSWORD',
+                              controller: confirmPasswordController,
+                              obscureText: true,
+                              onChanged: controller.clearError,
+                              validator: (value) {
+                                if (value != passwordController.text) {
+                                  return 'Passwords do not match.';
+                                }
+                                return null;
+                              },
+                            ),
+                          ],
+                          if (controller.error != null) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFE9E8),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: const Color(0xFFF3B1AF),
+                                ),
+                              ),
+                              child: Text(
+                                controller.error!,
+                                style: GoogleFonts.dmMono(
+                                  color: const Color(0xFF8F2D2D),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton(
+                              onPressed: controller.isBusy ? null : onSubmit,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: _HotTakePalette.red,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                              ),
+                              child: controller.isBusy
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : Text(
+                                      isLogin
+                                          ? 'sign in'
+                                          : 'create account',
+                                      style: GoogleFonts.dmMono(),
+                                    ),
+                            ),
+                          ),
+                          if (isLogin) ...[
+                            const SizedBox(height: 10),
+                            Center(
+                              child: GestureDetector(
+                                onTap: onForgotPassword,
+                                child: Text(
+                                  'forgot password?',
+                                  style: GoogleFonts.dmMono(
+                                    color: _HotTakePalette.muted,
+                                    fontSize: 13,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _ForgotScreen extends StatelessWidget {
   final TextEditingController emailController;
@@ -217,103 +577,70 @@ class _ForgotScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F5F2),
+      backgroundColor: _HotTakePalette.page,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 40),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'hot take.',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w400,
-                  color: Color(0xFF1A1714),
+              GestureDetector(
+                onTap: onBack,
+                child: Text(
+                  '← back to sign in',
+                  style: GoogleFonts.dmMono(
+                    color: _HotTakePalette.muted,
+                    fontSize: 13,
+                    decoration: TextDecoration.underline,
+                  ),
                 ),
               ),
-              const SizedBox(height: 48),
-              const Text(
+              const SizedBox(height: 24),
+              Text(
                 'forgot password',
-                style: TextStyle(
+                style: GoogleFonts.dmMono(
                   fontSize: 28,
-                  fontWeight: FontWeight.w400,
-                  color: Color(0xFF1A1714),
+                  color: _HotTakePalette.ink,
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 "enter your email and we'll send a reset link.",
-                style: TextStyle(fontSize: 14, color: Color(0xFF888780)),
-              ),
-              const SizedBox(height: 28),
-              const Text(
-                'EMAIL',
-                style: TextStyle(
-                  color: Color(0xFF888780),
-                  fontSize: 10,
-                  letterSpacing: 2,
-                  fontWeight: FontWeight.w600,
+                style: GoogleFonts.dmMono(
+                  fontSize: 14,
+                  color: _HotTakePalette.muted,
                 ),
               ),
-              const SizedBox(height: 8),
-              TextField(
+              const SizedBox(height: 24),
+              _LabeledField(
+                label: 'EMAIL',
                 controller: emailController,
                 keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  hintText: 'you@example.com',
-                  hintStyle: const TextStyle(color: Color(0xFFAAA49C)),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: Color(0xFFD9D4CC)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: Color(0xFFD9D4CC)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFE24B4A),
-                      width: 1.5,
-                    ),
-                  ),
-                ),
+                onChanged: () {},
+                validator: (_) => null,
               ),
               if (error != null) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 Text(
                   error!,
-                  style: const TextStyle(
-                    color: Color(0xFF8F2D2D),
+                  style: GoogleFonts.dmMono(
+                    color: const Color(0xFF8F2D2D),
                     fontSize: 13,
                   ),
                 ),
               ],
-              const SizedBox(height: 24),
+              const SizedBox(height: 18),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: isSending ? null : onSend,
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFE24B4A),
+                    backgroundColor: _HotTakePalette.red,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: Text(isSending ? 'sending...' : 'send reset link'),
-                ),
-              ),
-              const SizedBox(height: 16),
-              GestureDetector(
-                onTap: onBack,
-                child: const Text(
-                  '← back to sign in',
-                  style: TextStyle(
-                    color: Color(0xFF888780),
-                    fontSize: 13,
-                    decoration: TextDecoration.underline,
-                    decorationColor: Color(0xFF888780),
+                  child: Text(
+                    isSending ? 'sending...' : 'send reset link',
+                    style: GoogleFonts.dmMono(),
                   ),
                 ),
               ),
@@ -324,8 +651,6 @@ class _ForgotScreen extends StatelessWidget {
     );
   }
 }
-
-// ── Forgot password sent screen ──────────────────────────────────────────────
 
 class _ForgotSentScreen extends StatelessWidget {
   final String email;
@@ -336,93 +661,38 @@ class _ForgotSentScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F5F2),
+      backgroundColor: _HotTakePalette.page,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 40),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'hot take.',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w400,
-                  color: Color(0xFF1A1714),
-                ),
-              ),
-              const SizedBox(height: 48),
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFE9E8),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(
-                  Icons.mark_email_unread_outlined,
-                  color: Color(0xFFE24B4A),
-                  size: 28,
-                ),
-              ),
-              const SizedBox(height: 24),
-              const Text(
+              Text(
                 'check your email',
-                style: TextStyle(
+                style: GoogleFonts.dmMono(
                   fontSize: 28,
-                  fontWeight: FontWeight.w400,
-                  color: Color(0xFF1A1714),
+                  color: _HotTakePalette.ink,
                 ),
               ),
               const SizedBox(height: 12),
-              RichText(
-                text: TextSpan(
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF888780),
-                    height: 1.5,
-                  ),
-                  children: [
-                    const TextSpan(text: 'if an account exists for\n'),
-                    TextSpan(
-                      text: email,
-                      style: const TextStyle(
-                        color: Color(0xFF1A1714),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const TextSpan(
-                      text: ',\nwe sent a reset link. it expires in 1 hour.',
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1EFE8),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  "didn't get it? check your spam folder.",
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF888780),
-                    fontStyle: FontStyle.italic,
-                  ),
+              Text(
+                'if an account exists for $email, we sent a reset link. it expires in 1 hour.',
+                style: GoogleFonts.dmMono(
+                  fontSize: 14,
+                  color: _HotTakePalette.muted,
+                  height: 1.45,
                 ),
               ),
               const Spacer(),
               GestureDetector(
                 onTap: onBack,
-                child: const Text(
+                child: Text(
                   '← back to sign in',
-                  style: TextStyle(
-                    color: Color(0xFF888780),
+                  style: GoogleFonts.dmMono(
+                    color: _HotTakePalette.muted,
                     fontSize: 13,
                     decoration: TextDecoration.underline,
-                    decorationColor: Color(0xFF888780),
                   ),
                 ),
               ),
@@ -433,321 +703,6 @@ class _ForgotSentScreen extends StatelessWidget {
     );
   }
 }
-
-// ── Brand panel ──────────────────────────────────────────────────────────────
-
-class _BrandPanel extends StatelessWidget {
-  final bool compact;
-  final VoidCallback onSignIn;
-
-  const _BrandPanel({required this.compact, required this.onSignIn});
-
-  @override
-  Widget build(BuildContext context) {
-    final horizontalPadding = compact ? 20.0 : 32.0;
-    final titleSize = compact ? 54.0 : 72.0;
-
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFE24B4A), Color(0xFFC93E3D)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            top: -50,
-            right: -30,
-            child: _AccentCircle(
-              size: compact ? 120 : 170,
-              color: Colors.white.withValues(alpha: 0.08),
-            ),
-          ),
-          Positioned(
-            bottom: -70,
-            left: -40,
-            child: _AccentCircle(
-              size: compact ? 180 : 240,
-              color: Colors.black.withValues(alpha: 0.08),
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-              horizontalPadding,
-              compact ? 28 : 42,
-              horizontalPadding,
-              compact ? 20 : 30,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'hot',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: titleSize,
-                        height: 0.9,
-                        fontWeight: FontWeight.w300,
-                      ),
-                    ),
-                    Text(
-                      'take.',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: titleSize,
-                        height: 0.9,
-                        fontWeight: FontWeight.w300,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      'Match on shared interests. No profile photos. Less noise.',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.88),
-                        fontSize: compact ? 13 : 15,
-                        height: 1.35,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: const [
-                        _BrandChip(label: 'anonymous'),
-                        _BrandChip(label: 'interest-based'),
-                        _BrandChip(label: 'low pressure'),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'ALREADY HAVE AN ACCOUNT?',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.72),
-                        fontSize: 11,
-                        letterSpacing: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    FilledButton(
-                      onPressed: onSignIn,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF4A1B0C),
-                        foregroundColor: const Color(0xFFEF9F27),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 22,
-                          vertical: 14,
-                        ),
-                      ),
-                      child: const Text('sign in →'),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'hot take · interest-based matchmaking',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.7),
-                        fontSize: 11,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Auth panel ───────────────────────────────────────────────────────────────
-
-class _AuthPanel extends StatelessWidget {
-  final AuthMode mode;
-  final AuthController controller;
-  final GlobalKey<FormState> formKey;
-  final TextEditingController usernameController;
-  final TextEditingController emailController;
-  final TextEditingController passwordController;
-  final TextEditingController confirmPasswordController;
-  final ValueChanged<AuthMode> onModeChanged;
-  final Future<void> Function() onSubmit;
-  final VoidCallback? onForgotPassword;
-
-  const _AuthPanel({
-    required this.mode,
-    required this.controller,
-    required this.formKey,
-    required this.usernameController,
-    required this.emailController,
-    required this.passwordController,
-    required this.confirmPasswordController,
-    required this.onModeChanged,
-    required this.onSubmit,
-    this.onForgotPassword,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isLogin = mode == AuthMode.login;
-
-    return Container(
-      width: double.infinity,
-      color: const Color(0xFFF7F5F2),
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                isLogin ? 'sign in' : 'create account',
-                style: const TextStyle(
-                  fontSize: 34,
-                  fontWeight: FontWeight.w400,
-                  color: Color(0xFF1A1714),
-                ),
-              ),
-              const SizedBox(height: 18),
-              _ModeTabs(mode: mode, onModeChanged: onModeChanged),
-              const SizedBox(height: 24),
-              Form(
-                key: formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (!isLogin) ...[
-                      _LabeledField(
-                        label: 'USERNAME',
-                        controller: usernameController,
-                        onChanged: () => controller.clearError(),
-                        validator: (value) =>
-                            (value == null || value.trim().isEmpty)
-                                ? 'Username is required.'
-                                : null,
-                      ),
-                      const SizedBox(height: 14),
-                    ],
-                    _LabeledField(
-                      label: 'EMAIL',
-                      controller: emailController,
-                      onChanged: () => controller.clearError(),
-                      validator: (value) =>
-                          (value == null || value.trim().isEmpty)
-                              ? 'Email is required.'
-                              : null,
-                    ),
-                    const SizedBox(height: 14),
-                    _LabeledField(
-                      label: 'PASSWORD',
-                      controller: passwordController,
-                      obscureText: true,
-                      onChanged: () => controller.clearError(),
-                      validator: (value) =>
-                          (value == null || value.isEmpty)
-                              ? 'Password is required.'
-                              : null,
-                    ),
-                    if (!isLogin) ...[
-                      const SizedBox(height: 14),
-                      _LabeledField(
-                        label: 'CONFIRM PASSWORD',
-                        controller: confirmPasswordController,
-                        obscureText: true,
-                        onChanged: () => controller.clearError(),
-                        validator: (value) {
-                          if (value != passwordController.text) {
-                            return 'Passwords do not match.';
-                          }
-                          return null;
-                        },
-                      ),
-                    ],
-                    const SizedBox(height: 18),
-                    if (controller.error != null) ...[
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFE9E8),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFFF3B1AF)),
-                        ),
-                        child: Text(
-                          controller.error!,
-                          style: const TextStyle(
-                            color: Color(0xFF8F2D2D),
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                    ],
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed:
-                            controller.isBusy ? null : () => onSubmit(),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFFE24B4A),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                        ),
-                        child: controller.isBusy
-                            ? const SizedBox(
-                                height: 18,
-                                width: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Text(isLogin ? 'sign in' : 'create account'),
-                      ),
-                    ),
-                    if (isLogin) ...[
-                      const SizedBox(height: 12),
-                      Center(
-                        child: GestureDetector(
-                          onTap: onForgotPassword,
-                          child: const Text(
-                            'forgot password?',
-                            style: TextStyle(
-                              color: Color(0xFF888780),
-                              fontSize: 13,
-                              decoration: TextDecoration.underline,
-                              decorationColor: Color(0xFF888780),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 20),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Mode tabs ────────────────────────────────────────────────────────────────
 
 class _ModeTabs extends StatelessWidget {
   final AuthMode mode;
@@ -788,8 +743,6 @@ class _ModeTabs extends StatelessWidget {
   }
 }
 
-// ── Tab button ───────────────────────────────────────────────────────────────
-
 class _TabButton extends StatelessWidget {
   final String label;
   final bool selected;
@@ -807,7 +760,7 @@ class _TabButton extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
+        duration: const Duration(milliseconds: 140),
         curve: Curves.easeOut,
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
@@ -817,7 +770,7 @@ class _TabButton extends StatelessWidget {
         alignment: Alignment.center,
         child: Text(
           label,
-          style: TextStyle(
+          style: GoogleFonts.dmMono(
             color: selected
                 ? const Color(0xFF1A1714)
                 : const Color(0xFF888780),
@@ -829,8 +782,6 @@ class _TabButton extends StatelessWidget {
     );
   }
 }
-
-// ── Labeled field ────────────────────────────────────────────────────────────
 
 class _LabeledField extends StatelessWidget {
   final String label;
@@ -860,8 +811,8 @@ class _LabeledField extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            color: Color(0xFF888780),
+          style: GoogleFonts.dmMono(
+            color: _HotTakePalette.muted,
             fontSize: 10,
             letterSpacing: 2,
             fontWeight: FontWeight.w600,
@@ -875,9 +826,27 @@ class _LabeledField extends StatelessWidget {
           textInputAction: textInputAction,
           onChanged: (_) => onChanged(),
           validator: validator,
+          style: GoogleFonts.dmMono(color: _HotTakePalette.ink, fontSize: 14),
           decoration: InputDecoration(
             hintText: hintText,
-            hintStyle: const TextStyle(color: Color(0xFFAAA49C)),
+            hintStyle: GoogleFonts.dmMono(
+              color: const Color(0xFFAAA49C),
+              fontSize: 14,
+            ),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: _HotTakePalette.border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: _HotTakePalette.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: _HotTakePalette.red, width: 1.5),
+            ),
           ),
         ),
       ],
@@ -885,50 +854,63 @@ class _LabeledField extends StatelessWidget {
   }
 }
 
-// ── Brand chip ───────────────────────────────────────────────────────────────
-
-class _BrandChip extends StatelessWidget {
+class _HoverActionButton extends StatefulWidget {
   final String label;
+  final Color backgroundColor;
+  final Color textColor;
+  final VoidCallback onTap;
 
-  const _BrandChip({required this.label});
+  const _HoverActionButton({
+    required this.label,
+    required this.backgroundColor,
+    required this.textColor,
+    required this.onTap,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
+  State<_HoverActionButton> createState() => _HoverActionButtonState();
 }
 
-// ── Accent circle ────────────────────────────────────────────────────────────
-
-class _AccentCircle extends StatelessWidget {
-  final double size;
-  final Color color;
-
-  const _AccentCircle({required this.size, required this.color});
+class _HoverActionButtonState extends State<_HoverActionButton> {
+  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          curve: Curves.easeOut,
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            color: widget.backgroundColor,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: _hovered
+                ? const [
+                    BoxShadow(
+                      color: Color(0x3A4A1B0C),
+                      blurRadius: 0,
+                      offset: Offset(0, 5),
+                    ),
+                  ]
+                : null,
+          ),
+          transform: Matrix4.translationValues(0, _hovered ? -1 : 0, 0),
+          child: Center(
+            child: Text(
+              widget.label,
+              style: GoogleFonts.dmMono(
+                color: widget.textColor,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

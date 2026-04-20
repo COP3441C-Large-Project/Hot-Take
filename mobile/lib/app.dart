@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'controllers/auth_controller.dart';
 import 'controllers/matches_controller.dart';
@@ -20,6 +21,7 @@ class HotTakeApp extends StatelessWidget {
       title: 'Hot Take',
       theme: ThemeData(
         useMaterial3: true,
+        textTheme: GoogleFonts.dmMonoTextTheme(),
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFFE24B4A),
           brightness: Brightness.light,
