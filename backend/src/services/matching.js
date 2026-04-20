@@ -48,18 +48,6 @@ function cosineSimilarity(left, right) {
   return dotProduct(left, right) / (leftMagnitude * rightMagnitude);
 }
 
-function extractTerms(text = '') {
-  return text
-    .toLowerCase()
-    .split(/[^a-z0-9]+/i)
-    .map((term) => term.trim())
-    .filter((term) => term.length > 2);
-}
-
-function uniqueTerms(values) {
-  return [...new Set(values)];
-}
-
 function buildPromptFromProfile({ bio = '', tags = [] }) {
   const normalizedTags = Array.isArray(tags)
     ? tags.map((tag) => String(tag).trim()).filter(Boolean)
@@ -105,18 +93,12 @@ export function scoreMatch(currentUser, candidate) {
   );
 
   const sharedTags = [...currentTags].filter((tag) => candidateTags.has(tag));
-
-  const currentTerms = new Set(extractTerms(currentUser.bio ?? ''));
-  const candidateTerms = new Set(extractTerms(candidate.bio ?? ''));
-  const sharedTerms = [...currentTerms].filter((term) => candidateTerms.has(term));
-
   const tagScore = sharedTags.length * 20;
-  const termScore = Math.min(sharedTerms.length * 5, 40);
 
   return {
-    score: Math.max(0, Math.min(100, tagScore + termScore)),
+    score: Math.max(0, Math.min(100, tagScore)),
     sharedTags,
-    sharedTerms,
+    sharedTerms: [],
   };
 }
 
