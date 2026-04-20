@@ -32,7 +32,9 @@ const ALLOWED_ORIGINS = [
   CLIENT_URL,
   'http://localhost:5173',
   'http://localhost:65292',
-  'http://127.0.0.1:5173'
+  'http://127.0.0.1:5173',
+  'http://4331project.xyz',
+  'https://4331project.xyz'
 ];
 
 function getAllowOrigin(request) {
