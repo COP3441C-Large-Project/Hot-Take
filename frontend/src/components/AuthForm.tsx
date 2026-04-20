@@ -11,7 +11,7 @@ interface AuthFormProps {
   onTabChange: (tab: AuthTab) => void;
 }
 
-const SERVER_URL = "http://localhost:3001";
+const SERVER_URL = import.meta.env.VITE_API_URL;
 
 const AuthForm: React.FC<AuthFormProps> = ({ activeTab, onTabChange }) => {
   const navigate = useNavigate();

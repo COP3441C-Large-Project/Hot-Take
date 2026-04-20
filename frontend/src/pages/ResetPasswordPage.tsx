@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 
-const SERVER_URL = "http://localhost:3001";
+const SERVER_URL = import.meta.env.VITE_API_URL;
 
 const ResetPasswordPage: React.FC = () => {
   const [searchParams] = useSearchParams();

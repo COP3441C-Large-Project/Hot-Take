@@ -5,7 +5,7 @@ import ChatWindow from "../components/ChatWindow/ChatWindow";
 import { useChat } from "../hooks/useChat";
 import { useAuth } from "../hooks/useAuth";
 
-const SERVER_URL = "http://localhost:3001";
+const SERVER_URL = import.meta.env.VITE_API_URL;
 
 const MatchesPage: React.FC = () => {
   const { token, user, isLoading } = useAuth();
