@@ -74,6 +74,7 @@ jobs:
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             cd /home/ivie/COP4331-Large-Project
+            git reset --hard HEAD
             git pull origin main
             cd frontend
             npm install
@@ -83,4 +84,3 @@ jobs:
             pm2 restart backend || pm2 start ecosystem.config.cjs
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
-          
