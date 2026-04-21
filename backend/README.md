@@ -1,63 +1,123 @@
 # Hot Take Backend
 
-This backend is a starter API for the mockup flows:
+This backend is the main working part of the project right now. It provides account creation, email verification, sign-in, interests storage, match generation, chat creation, and message sending on top of MongoDB.
 
-- account creation and sign in
-- saving a user's interests and takes
-- generating matches from shared tags and overlapping opinion text
-- opening chats and sending messages
+The server is a small Node.js HTTP app in `src/server.js`, with MongoDB access in `src/data/` and matching/email helpers in `src/services/`.
 
-It uses MongoDB for all data storage.
+## What it does
+
+- registers users with hashed passwords
+- requires email verification before login
+- stores users in MongoDB
+- creates in-memory session tokens after login
+- saves a user's bio and topic tags
+- scores matches from shared tags and overlapping bio terms
+- creates chats and stores messages in MongoDB
+
+## Requirements
+
+- Node.js with npm
+- a MongoDB database reachable through `MONGODB_URI`
 
 ## Environment variables
 
 | Variable | Required | Description |
-|---|---|---|
-| `MONGODB_URI` | Yes | Full MongoDB connection string, e.g. `mongodb+srv://user:pass@cluster.mongodb.net/mernapp` |
-| `PORT` | No | Port to listen on (default `3001`) |
+| --- | --- | --- |
+| `MONGODB_URI` | Yes | MongoDB connection string used by `MongoClient` |
+| `PORT` | No | HTTP port, default `3001` |
+| `HOST` | No | Bind host, default `127.0.0.1` |
+| `FRONTEND_URL` | No | Base URL used to build email verification links, default `http://localhost:5173` |
+| `RESEND_API_KEY` | No | Resend API key for real email delivery |
+| `EMAIL_FROM` | No | Verified sender identity used by Resend |
 
-The server will refuse to start if `MONGODB_URI` is not set.
+If `MONGODB_URI` is missing, the server exits on startup.
 
-## Run it
+If `RESEND_API_KEY` or `EMAIL_FROM` is missing, registration still works, but the verification link is printed in the backend terminal instead of being emailed.
+
+## Install and run
 
 ```bash
 cd backend
-MONGODB_URI="mongodb+srv://user:pass@cluster.mongodb.net/mernapp" npm run dev
+npm install
+npm run dev
 ```
 
-The API starts on `http://localhost:3001`.
+Example `.env`:
 
-## Suggested data model for MongoDB
+```env
+MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/hot-take
+PORT=3001
+HOST=127.0.0.1
+FRONTEND_URL=http://localhost:5173
+RESEND_API_KEY=
+EMAIL_FROM=
+```
+
+Default local server URL:
+
+```text
+http://127.0.0.1:3001
+```
+
+## Scripts
+
+- `npm run dev` runs `node --watch src/server.js`
+- `npm start` runs `node src/server.js`
+
+## Architecture
+
+### `src/server.js`
+
+- validates required environment variables
+- creates the HTTP server
+- parses JSON request bodies
+- handles routing and CORS
+- connects to MongoDB before listening
+
+### `src/data/db.js`
+
+- creates the shared MongoDB client
+- connects once at startup
+- exposes `getDB()` for collection access
+
+### `src/data/store.js`
+
+- contains the main application logic
+- stores login sessions in memory with `Map`
+- reads and writes `users` and `chats`
+- sanitizes user objects before returning them to clients
+
+### `src/services/email.js`
+
+- builds verification URLs from `FRONTEND_URL`
+- sends email through Resend when configured
+- falls back to logging verification links locally
+
+### `src/services/matching.js`
+
+- calculates match scores from shared tags and shared terms in user bios
+
+## Data model
+
+The code currently relies on MongoDB collections with shapes like these.
 
 ### `users`
 
 ```json
 {
   "_id": "ObjectId",
+  "id": "user_ab12cd34",
   "username": "demo_user",
   "email": "demo@hottake.app",
-  "passwordHash": "hashed password",
-  "bio": "What the user wants to talk about and their opinions",
-  "tags": ["film", "philosophy", "writing"],
-  "createdAt": "ISO date",
-  "updatedAt": "ISO date",
-  "lastActiveAt": "ISO date"
-}
-```
-
-### `matches`
-
-You can compute matches live at first, or persist them later if you want:
-
-```json
-{
-  "_id": "ObjectId",
-  "userId": "ObjectId",
-  "matchedUserId": "ObjectId",
-  "score": 92,
-  "sharedTags": ["film", "philosophy"],
-  "sharedTerms": ["classics", "cinema"],
-  "createdAt": "ISO date"
+  "passwordHash": "bcrypt hash",
+  "emailVerified": false,
+  "emailVerificationTokenHash": "sha256 hash",
+  "emailVerificationExpiresAt": "2026-04-21T15:00:00.000Z",
+  "bio": "",
+  "tags": [],
+  "createdAt": "2026-04-20T15:00:00.000Z",
+  "updatedAt": "2026-04-20T15:00:00.000Z",
+  "lastActiveAt": "2026-04-20T15:00:00.000Z"
 }
 ```
 
@@ -66,40 +126,32 @@ You can compute matches live at first, or persist them later if you want:
 ```json
 {
   "_id": "ObjectId",
-  "participantIds": ["ObjectId", "ObjectId"],
-  "createdAt": "ISO date",
-  "updatedAt": "ISO date"
+  "id": "chat_ab12cd34",
+  "participantIds": ["user_one", "user_two"],
+  "createdAt": "2026-04-20T15:00:00.000Z",
+  "updatedAt": "2026-04-20T15:00:00.000Z",
+  "messages": [
+    {
+      "id": "msg_ab12cd34",
+      "senderId": "user_one",
+      "text": "Message body",
+      "sentAt": "2026-04-20T15:05:00.000Z"
+    }
+  ]
 }
 ```
 
-### `messages`
+Matches are computed on demand from the `users` collection rather than stored in a dedicated collection.
 
-```json
-{
-  "_id": "ObjectId",
-  "chatId": "ObjectId",
-  "senderId": "ObjectId",
-  "text": "Message body",
-  "sentAt": "ISO date"
-}
-```
-
-## Endpoints
+## API routes
 
 ### Auth
 
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `GET /api/me`
+#### `POST /api/auth/register`
 
-## Postman testing
+Creates a user account and sends or logs a verification link.
 
-### 1. Register a new user
-
-- Method: `POST`
-- URL: `http://localhost:3001/api/auth/register`
-- Headers: `Content-Type: application/json`
-- Body (raw JSON):
+Request body:
 
 ```json
 {
@@ -109,33 +161,33 @@ You can compute matches live at first, or persist them later if you want:
 }
 ```
 
-Expected response `201`:
+Successful response:
 
 ```json
 {
-  "token": "<session-token>",
+  "message": "Account created. Check your email to verify your account before signing in.",
   "user": {
     "id": "user_xxxxxxxx",
     "username": "testuser",
     "email": "test@example.com",
+    "emailVerified": false,
     "bio": "",
     "tags": [],
-    "createdAt": "2024-01-01T00:00:00.000Z",
-    "updatedAt": "2024-01-01T00:00:00.000Z"
-  }
+    "createdAt": "2026-04-20T15:00:00.000Z",
+    "updatedAt": "2026-04-20T15:00:00.000Z"
+  },
+  "verificationUrl": "http://localhost:5173/verify-email?token=..."
 }
 ```
 
-Copy the `token` value. You will use it as the Bearer token for all protected routes.
+Notes:
 
-If the email is already registered you will get `409` with `{ "error": "Email already registered." }`.
+- `verificationUrl` is only included when the app is using local log mode instead of Resend.
+- If the email already exists but is still unverified, the backend refreshes the verification token and returns a new verification link instead of creating a duplicate user.
 
-### 2. Login
+#### `POST /api/auth/login`
 
-- Method: `POST`
-- URL: `http://localhost:3001/api/auth/login`
-- Headers: `Content-Type: application/json`
-- Body (raw JSON):
+Request body:
 
 ```json
 {
@@ -144,38 +196,44 @@ If the email is already registered you will get `409` with `{ "error": "Email al
 }
 ```
 
-Expected response `200`:
+Successful response:
 
 ```json
 {
-  "token": "<session-token>",
+  "token": "session-token",
   "user": {
     "id": "user_xxxxxxxx",
     "username": "testuser",
     "email": "test@example.com",
+    "emailVerified": true,
     "bio": "",
     "tags": [],
-    "createdAt": "2024-01-01T00:00:00.000Z",
-    "updatedAt": "2024-01-01T00:00:00.000Z"
+    "createdAt": "2026-04-20T15:00:00.000Z",
+    "updatedAt": "2026-04-20T15:00:00.000Z"
   }
 }
 ```
 
-Wrong credentials return `401` with `{ "error": "Invalid email or password." }`.
+Common failures:
 
-### 3. Using the token in Postman
+- `401` for invalid email/password
+- `401` if the account has not been verified yet
 
-For any protected route (`/api/me`, `/api/interests`, `/api/matches`, etc.):
+#### `GET /api/auth/verify-email?token=...`
 
-1. Go to the **Authorization** tab
-2. Select type **Bearer Token**
-3. Paste the `token` value from the register or login response
+Marks the user as verified if the token hash matches and the token is still within its 24-hour lifetime.
+
+#### `GET /api/me`
+
+Returns the current signed-in user for a valid bearer token.
 
 ### Interests
 
-- `PUT /api/interests`
+#### `PUT /api/interests`
 
-Example body:
+Requires `Authorization: Bearer <token>`.
+
+Request body:
 
 ```json
 {
@@ -184,25 +242,81 @@ Example body:
 }
 ```
 
+Behavior:
+
+- trims the bio
+- lowercases tags
+- removes duplicate tags
+- limits the saved tag list to 10 items
+
 ### Matches
 
-- `GET /api/matches`
-- `POST /api/matches/:matchUserId/start-chat`
+#### `GET /api/matches`
 
-### Chat
+Requires authentication.
 
-- `GET /api/chats`
-- `GET /api/chats/:chatId/messages`
-- `POST /api/chats/:chatId/messages`
+Returns scored candidate matches based on:
 
-All protected routes expect:
+- shared tags
+- shared terms extracted from user bios
 
-```http
-Authorization: Bearer <token>
+Only matches with a score greater than `0` are returned.
+
+#### `POST /api/matches/:matchUserId/start-chat`
+
+Requires authentication.
+
+- creates a new chat if one does not already exist
+- returns the existing `chatId` if the pair already has a chat
+
+### Chats
+
+#### `GET /api/chats`
+
+Returns all chats for the current user, including:
+
+- the other participant
+- computed match score
+- shared tags
+- the last message
+
+#### `GET /api/chats/:chatId/messages`
+
+Returns the messages for a chat the current user belongs to.
+
+#### `POST /api/chats/:chatId/messages`
+
+Request body:
+
+```json
+{
+  "text": "hear me out..."
+}
 ```
+
+Creates a message object and appends it to the chat's `messages` array.
+
+## Local testing flow
+
+1. Start the backend with a real `MONGODB_URI`.
+2. Register a user with `POST /api/auth/register`.
+3. Copy the logged `verificationUrl` from the backend terminal if email delivery is not configured.
+4. Open `GET /api/auth/verify-email?token=...` directly or use the frontend `/verify-email` page.
+5. Log in with `POST /api/auth/login`.
+6. Use the returned bearer token for `/api/me`, `/api/interests`, `/api/matches`, and chat routes.
+
+## Important implementation notes
+
+- sessions are in memory, so restarting the server invalidates all active login tokens
+- the server uses a native Node HTTP server, not Express
+- CORS is currently open to all origins
+- chats store messages inline inside each chat document
+- there is no automated test suite in the backend yet
 
 ## Good next steps
 
-1. Replace the random session token map with JWTs so sessions survive server restarts.
-2. Add Socket.IO for live chat updates.
-3. Let the frontend call `GET /api/matches` after the user saves their interests page.
+1. Replace the in-memory session map with JWTs or persistent sessions.
+2. Add request-level validation helpers for cleaner error handling.
+3. Split chat messages into their own collection if message volume grows.
+4. Add automated API tests for auth, verification, and chat flows.
+5. Wire the frontend matches and auth screens to these live endpoints.
