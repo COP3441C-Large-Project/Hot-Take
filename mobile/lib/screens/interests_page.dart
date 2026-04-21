@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../controllers/auth_controller.dart';
+import '../config/api_config.dart';
 
 class InterestsPage extends StatefulWidget {
   final AuthController authController;
@@ -87,7 +88,7 @@ class _InterestsPageState extends State<InterestsPage> {
     try {
       final token = widget.authController.token;
       final response = await http.put(
-        Uri.parse('http://10.0.2.2:3001/api/interests'),
+        Uri.parse('${ApiConfig.baseUrl}/api/interests'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',

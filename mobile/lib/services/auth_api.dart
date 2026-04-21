@@ -128,42 +128,13 @@ class AuthApi {
     if (uri == null || uri.host.isEmpty) {
       throw ArgumentError('Invalid API base URL.');
     }
-
-    final isHttp = uri.scheme == 'http';
-    final isLocal = _isLocalHost(uri.host);
-    if (isHttp && (kReleaseMode || !isLocal)) {
-      throw ArgumentError('Insecure API base URL is not allowed.');
-    }
-
     return value;
   }
 
   static String _defaultBaseUrl() {
     const override = String.fromEnvironment('API_BASE_URL');
-    if (override.isNotEmpty) {
-      return override;
-    }
-
-    if (kIsWeb) {
-      return 'http://127.0.0.1:3001'; 
-    }
-
-    switch (defaultTargetPlatform) {
-      case TargetPlatform.iOS:
-        return 'http://127.0.0.1:3001';
-      case TargetPlatform.android:
-        return 'http://10.0.2.2:3001';
-      case TargetPlatform.macOS:
-        return 'http://127.0.0.1:3001';
-      case TargetPlatform.windows:
-        return 'http://127.0.0.1:3001';
-      case TargetPlatform.linux:
-        return 'http://127.0.0.1:3001';
-      case TargetPlatform.fuchsia:
-        return 'http://127.0.0.1:3001';
-      default:
-        return 'http://167.99.155.122:3001';
-    }
+    if (override.isNotEmpty) return override;
+    return 'http://167.99.155.122'; // same for all platforms
   }
 
   static bool _isLocalHost(String host) {
