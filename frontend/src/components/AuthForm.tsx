@@ -258,6 +258,16 @@ const AuthForm: React.FC<AuthFormProps> = ({ activeTab, onTabChange }) => {
                         />
                     </div>
 
+                    {activeTab === "login" && (
+                      <button
+                        type="button"
+                        onClick={() => { setView("forgot"); setFormError(null); clearError(); }}
+                        className="text-left text-sm text-[#888780] underline"
+                      >
+                        forgot password?
+                      </button>
+                    )}
+
                     {activeTab === "register" && (
                         <div>
                             <label className="mb-2 block text-[10px] font-light uppercase tracking-[0.2em] text-[#888780]">CONFIRM PASSWORD</label>
