@@ -7,7 +7,7 @@ info:
 
     Replace the host, basePath, and schemes values with your deployed backend
     before presenting in SwaggerHub or Swagger UI.
-host: localhost:3001
+host: '4331project.xyz'
 basePath: /
 schemes:
   - http
@@ -83,11 +83,11 @@ definitions:
       createdAt:
         type: string
         format: date-time
-        example: 2026-04-15T18:20:00.000Z
+        example: '2026-04-15T18:20:00.000Z'
       updatedAt:
         type: string
         format: date-time
-        example: 2026-04-15T18:20:00.000Z
+        example: '2026-04-15T18:20:00.000Z'
   AuthRegisterRequest:
     type: object
     required:
@@ -242,11 +242,11 @@ definitions:
         example: user_a1b2c3d4
       text:
         type: string
-        example: "Hot take: modern horror is carrying television right now."
+        example: 'Hot take: modern horror is carrying television right now.'
       sentAt:
         type: string
         format: date-time
-        example: 2026-04-15T18:40:00.000Z
+        example: '2026-04-15T18:40:00.000Z'
   ChatSummary:
     type: object
     required:
@@ -302,7 +302,7 @@ definitions:
     properties:
       text:
         type: string
-        example: I disagree, prestige drama still clears.
+        example: 'I disagree, prestige drama still clears.'
   SendMessageResponse:
     type: object
     required:
@@ -318,7 +318,7 @@ paths:
       summary: Health check
       operationId: getHealth
       responses:
-        200:
+        '200':
           description: Backend is running
           schema:
             $ref: '#/definitions/HealthResponse'
@@ -336,19 +336,19 @@ paths:
           schema:
             $ref: '#/definitions/AuthRegisterRequest'
       responses:
-        201:
+        '201':
           description: User created successfully
           schema:
             $ref: '#/definitions/AuthSuccessResponse'
-        400:
+        '400':
           description: Missing required fields
           schema:
             $ref: '#/definitions/ErrorResponse'
-        409:
+        '409':
           description: Email already exists
           schema:
             $ref: '#/definitions/ErrorResponse'
-        500:
+        '500':
           description: Unexpected server error
           schema:
             $ref: '#/definitions/ErrorResponse'
@@ -366,19 +366,157 @@ paths:
           schema:
             $ref: '#/definitions/AuthLoginRequest'
       responses:
-        200:
+        '200':
           description: Login successful
           schema:
             $ref: '#/definitions/AuthSuccessResponse'
-        400:
+        '400':
           description: Missing required fields
           schema:
             $ref: '#/definitions/ErrorResponse'
-        401:
+        '401':
           description: Invalid credentials
           schema:
             $ref: '#/definitions/ErrorResponse'
-        500:
+        '500':
+          description: Unexpected server error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/auth/send-verification:
+    post:
+      tags:
+        - Auth
+      summary: Send verification email to a registered user
+      operationId: sendVerificationEmail
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - userId
+            properties:
+              userId:
+                type: string
+                example: user_9004c692
+      responses:
+        '200':
+          description: Verification email sent
+          schema:
+            type: object
+            properties:
+              ok:
+                type: boolean
+                example: true
+        '400':
+          description: Missing userId or user not found
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        '500':
+          description: Unexpected server error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/auth/verify-email:
+    post:
+      tags:
+        - Auth
+      summary: Verify email using token from verification link
+      operationId: verifyEmail
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - token
+            properties:
+              token:
+                type: string
+                example: 550e8400-e29b-41d4-a716-446655440000
+      responses:
+        '200':
+          description: Email verified successfully
+          schema:
+            $ref: '#/definitions/AuthSuccessResponse'
+        '400':
+          description: Invalid or expired token
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        '500':
+          description: Unexpected server error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/auth/forgot-password:
+    post:
+      tags:
+        - Auth
+      summary: Send password reset email
+      operationId: forgotPassword
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - email
+            properties:
+              email:
+                type: string
+                format: email
+                example: demo_user@example.com
+      responses:
+        '200':
+          description: Reset email sent if account exists
+          schema:
+            type: object
+            properties:
+              ok:
+                type: boolean
+                example: true
+        '400':
+          description: Missing email
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        '500':
+          description: Unexpected server error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/auth/reset-password:
+    post:
+      tags:
+        - Auth
+      summary: Reset password using token from reset email
+      operationId: resetPassword
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - token
+              - password
+            properties:
+              token:
+                type: string
+                example: 550e8400-e29b-41d4-a716-446655440000
+              password:
+                type: string
+                format: password
+                example: NewPassword123!
+      responses:
+        '200':
+          description: Password reset successfully
+          schema:
+            $ref: '#/definitions/AuthSuccessResponse'
+        '400':
+          description: Invalid or expired token
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        '500':
           description: Unexpected server error
           schema:
             $ref: '#/definitions/ErrorResponse'
@@ -391,19 +529,51 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        200:
+        '200':
           description: Current user
           schema:
             $ref: '#/definitions/CurrentUserResponse'
-        401:
+        '401':
           description: Missing or invalid bearer token
           schema:
             $ref: '#/definitions/ErrorResponse'
-        500:
+        '500':
           description: Unexpected server error
           schema:
             $ref: '#/definitions/ErrorResponse'
   /api/interests:
+    get:
+      tags:
+        - Profile
+      summary: Get the authenticated user's bio and tags
+      operationId: getInterests
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User interests
+          schema:
+            type: object
+            properties:
+              bio:
+                type: string
+                example: I want to debate whether modern horror is better than prestige drama.
+              tags:
+                type: array
+                items:
+                  type: string
+                example:
+                  - film
+                  - horror
+                  - tv
+        '401':
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        '500':
+          description: Unexpected server error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
     put:
       tags:
         - Profile
@@ -419,19 +589,19 @@ paths:
           schema:
             $ref: '#/definitions/UpdateInterestsRequest'
       responses:
-        200:
+        '200':
           description: Interests updated
           schema:
             $ref: '#/definitions/UpdateInterestsResponse'
-        400:
+        '400':
           description: Invalid request body
           schema:
             $ref: '#/definitions/ErrorResponse'
-        401:
+        '401':
           description: Missing or invalid bearer token
           schema:
             $ref: '#/definitions/ErrorResponse'
-        500:
+        '500':
           description: Unexpected server error
           schema:
             $ref: '#/definitions/ErrorResponse'
@@ -444,19 +614,19 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        200:
+        '200':
           description: Match results
           schema:
             $ref: '#/definitions/MatchListResponse'
-        401:
+        '401':
           description: Missing or invalid bearer token
           schema:
             $ref: '#/definitions/ErrorResponse'
-        500:
+        '500':
           description: Unexpected server error
           schema:
             $ref: '#/definitions/ErrorResponse'
-  /api/matches/{matchUserId}/start-chat:
+  '/api/matches/{matchUserId}/start-chat':
     post:
       tags:
         - Matches
@@ -471,19 +641,19 @@ paths:
           required: true
           type: string
       responses:
-        201:
-          description: Chat created, or existing chat returned
+        '201':
+          description: 'Chat created, or existing chat returned'
           schema:
             $ref: '#/definitions/StartChatResponse'
-        401:
+        '401':
           description: Missing or invalid bearer token
           schema:
             $ref: '#/definitions/ErrorResponse'
-        404:
+        '404':
           description: Matched user not found
           schema:
             $ref: '#/definitions/ErrorResponse'
-        500:
+        '500':
           description: Unexpected server error
           schema:
             $ref: '#/definitions/ErrorResponse'
@@ -496,19 +666,19 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        200:
+        '200':
           description: Chat summaries
           schema:
             $ref: '#/definitions/ChatListResponse'
-        401:
+        '401':
           description: Missing or invalid bearer token
           schema:
             $ref: '#/definitions/ErrorResponse'
-        500:
+        '500':
           description: Unexpected server error
           schema:
             $ref: '#/definitions/ErrorResponse'
-  /api/chats/{chatId}/messages:
+  '/api/chats/{chatId}/messages':
     get:
       tags:
         - Chats
@@ -523,19 +693,19 @@ paths:
           required: true
           type: string
       responses:
-        200:
+        '200':
           description: Messages in the chat
           schema:
             $ref: '#/definitions/ChatMessagesResponse'
-        401:
+        '401':
           description: Missing or invalid bearer token
           schema:
             $ref: '#/definitions/ErrorResponse'
-        404:
+        '404':
           description: Chat not found
           schema:
             $ref: '#/definitions/ErrorResponse'
-        500:
+        '500':
           description: Unexpected server error
           schema:
             $ref: '#/definitions/ErrorResponse'
@@ -559,23 +729,23 @@ paths:
           schema:
             $ref: '#/definitions/SendMessageRequest'
       responses:
-        201:
+        '201':
           description: Message sent
           schema:
             $ref: '#/definitions/SendMessageResponse'
-        400:
+        '400':
           description: Missing required text
           schema:
             $ref: '#/definitions/ErrorResponse'
-        401:
+        '401':
           description: Missing or invalid bearer token
           schema:
             $ref: '#/definitions/ErrorResponse'
-        404:
+        '404':
           description: Chat not found
           schema:
             $ref: '#/definitions/ErrorResponse'
-        500:
+        '500':
           description: Unexpected server error
           schema:
             $ref: '#/definitions/ErrorResponse'
