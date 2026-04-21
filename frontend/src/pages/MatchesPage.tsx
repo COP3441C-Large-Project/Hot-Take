@@ -14,6 +14,7 @@ const MatchesPage: React.FC = () => {
   const [chatId, setChatId] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<"matches" | "interests">("matches");
   
+  // State for the current user's own interests/bio
   const [userInterests, setUserInterests] = useState<{ bio: string; tags: string[] }>({
     bio: "",
     tags: [],
@@ -24,6 +25,7 @@ const MatchesPage: React.FC = () => {
 
     const loadData = async () => {
       try {
+        // 1. Load Matches
         const matchData = await apiClient.get<{ matches: any[] }>("/api/matches", token);
         const loadedMatches: Match[] = (matchData.matches ?? []).map((m: any) => ({
           id: m.userId,
@@ -35,12 +37,14 @@ const MatchesPage: React.FC = () => {
         }));
         setMatches(loadedMatches);
 
-        const profileData = await apiClient.get<{ bio: string; tags: string[] }>("/api/interests", token);
+        // 2. Load User's Own Interests (to show in the Interests tab)
+       const profileData = await apiClient.get<{ bio: string; tags: string[] }>("/api/interests", token);
+    
         setUserInterests({
-          bio: profileData.bio ?? "",
-          tags: profileData.tags ?? [],
+          bio: profileData.bio || "",
+          tags: profileData.tags || [],
         });
-
+        // Automatically open chat with first match if matches exist
         if (loadedMatches.length > 0 && !selectedMatch) {
           setSelectedMatch(loadedMatches[0]);
           const chatData = await apiClient.post<{ chatId: string }>(
@@ -48,6 +52,7 @@ const MatchesPage: React.FC = () => {
             {},
             token
           );
+          console.log("raw matches:", matchData.matches);
           if (chatData.chatId) setChatId(chatData.chatId);
         }
       } catch (err) {
@@ -60,7 +65,7 @@ const MatchesPage: React.FC = () => {
 
   const handleSelectMatch = useCallback(async (match: Match) => {
     setSelectedMatch(match);
-    setActiveSection("matches");
+    setActiveSection("matches"); // Switch back to chat view when a match is clicked
     setChatId(null);
 
     if (!token) return;
@@ -111,6 +116,7 @@ const MatchesPage: React.FC = () => {
             connectionStatus={connectionStatus}
           />
         ) : (
+          /* USER INTERESTS VIEW */
           <div className="p-10 max-w-2xl mx-auto">
             <h2 className="text-2xl font-bold mb-6 font-[var(--font-display)]">your profile vibe</h2>
             
@@ -137,7 +143,7 @@ const MatchesPage: React.FC = () => {
             </div>
 
             <button 
-              onClick={() => window.location.href = '/interests'}
+              onClick={() => window.location.href = '/interests'} // or use navigate()
               className="mt-10 text-sm font-bold text-rose-500 hover:underline"
             >
               edit my interests →

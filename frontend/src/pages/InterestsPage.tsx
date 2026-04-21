@@ -98,33 +98,15 @@ const InterestsPage: React.FC = () => {
     return;
   }
 
-  try {
-    setIsLoading(true);
-    
-    await apiClient.put("/api/interests", { bio, tags }, token);
-
-    const pollForMatches = setInterval(async () => {
-      try {
-        const response = await apiClient.get<{ matches: any[] }>("/api/matches", token);
-        
-        if (response.matches && response.matches.length > 0) {
-          clearInterval(pollForMatches);
-          navigate("/matches");
-        }
-      } catch (err) {
-        console.error("Polling error:", err);
-      }
-    }, 1500);
-
-    setTimeout(() => {
-      clearInterval(pollForMatches);
-      navigate("/matches");
-    }, 10000);
-
-  } catch (err) {
+  setIsLoading(true);
+  
+  // Fire and forget — don't await
+  apiClient.put("/api/interests", { bio, tags }, token).catch((err) => {
     console.error("Failed to save interests:", err);
-    setIsLoading(false);
-  }
+  });
+
+  // Navigate after 2 seconds no matter what
+  setTimeout(() => navigate("/matches"), 2000);
 };
 
   const bgStyle = paradiseMode
@@ -146,7 +128,7 @@ const InterestsPage: React.FC = () => {
             </div>
             <div>
                 <h2 className="text-2xl font-bold font-[var(--font-display)] text-gray-900">Finding matches...</h2>
-                <p className="text-sm text-gray-500 italic mt-2">Our AI is analyzing your vibe to find the best people for you.</p>
+                <p className="text-sm text-gray-500 italic mt-2">Hang tight while we find the best people for you.</p>
             </div>
           </div>
         </div>

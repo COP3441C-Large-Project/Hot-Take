@@ -253,10 +253,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ activeTab, onTabChange }) => {
                         <input
                             type="password"
                             value={password}
-                            onChange={(event) => {
-                                resetAuthErrors();
-                                setPassword(event.target.value);
-                            }}
+                            onChange={(e) => { resetAll(); setPassword(e.target.value); }}
                             className="w-full rounded-lg border border-[#D3D1C7] bg-[#F7F7F5] px-4 py-3 text-[#888780] outline-none transition placeholder:text-[#888780] focus:border-[#EF9F27]"
                         />
                     </div>
@@ -267,10 +264,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ activeTab, onTabChange }) => {
                             <input
                                 type="password"
                                 value={confirmPassword}
-                                onChange={(event) => {
-                                    resetAuthErrors();
-                                    setConfirmPassword(event.target.value);
-                                }}
+                                onChange={(e) => { resetAll(); setConfirmPassword(e.target.value); }}
                                 className="w-full rounded-lg border border-[#D3D1C7] bg-[#F7F7F5] px-4 py-3 text-[#888780] outline-none transition placeholder:text-[#888780] focus:border-[#EF9F27]"
                             />
                         </div>
