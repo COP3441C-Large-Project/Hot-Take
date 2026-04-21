@@ -59,23 +59,21 @@ const MatchesPage: React.FC = () => {
   }, [token]);
 
   const handleSelectMatch = useCallback(async (match: Match) => {
-    setSelectedMatch(match);
-    setActiveSection("matches");
-    setChatId(null);
+  setSelectedMatch(match);
+  setActiveSection("matches");
 
-    if (!token) return;
-
-    try {
-      const data = await apiClient.post<{ chatId: string }>(
-        `/api/matches/${match.id}/start-chat`,
-        {},
-        token
-      );
-      if (data.chatId) setChatId(data.chatId);
-    } catch (err) {
-      console.error("Failed to start chat:", err);
-    }
-  }, [token]);
+  if (!token) return;
+  try {
+    const data = await apiClient.post<{ chatId: string }>(
+      `/api/matches/${match.id}/start-chat`,
+      {},
+      token
+    );
+    if (data.chatId) setChatId(data.chatId);
+  } catch (err) {
+    console.error("Failed to start chat:", err);
+  }
+}, [token]);
 
   const { messages, sendMessage, connectionStatus, isTyping } = useChat({
     chatId,
