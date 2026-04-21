@@ -55,8 +55,8 @@ const App: React.FC = () => {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/" element={<AuthPage />} />
         <Route path="/how-it-works" element={<PlaceholderPage title="how it works" />} />
-        <Route path="/interests" element={<InterestsPage />} />
-        <Route path="/matches" element={<MatchesPage />} />
+        <Route path="/interests" element={<ProtectedRoute><InterestsPage /></ProtectedRoute>} />
+        <Route path="/matches" element={<ProtectedRoute><MatchesPage /></ProtectedRoute>} />
         <Route path="/chat" element={<Navigate to="/matches" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       
