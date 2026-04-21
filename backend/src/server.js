@@ -31,6 +31,7 @@ const CLIENT_URL = process.env.APP_URL ?? 'http://localhost:5173';
 const ALLOWED_ORIGINS = [
   CLIENT_URL,
   'http://localhost:5173',
+  'http://localhost:59008',
   'http://localhost:65292',
   'http://127.0.0.1:5173',
   'http://4331project.xyz',

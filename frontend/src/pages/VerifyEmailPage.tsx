@@ -34,6 +34,7 @@ const VerifyEmailPage: React.FC = () => {
           setMessage(data.error);
           return;
         }
+        localStorage.setItem("hot_take_token", data.token);
         setStatus("success");
         // Auto redirect to interests after 2 seconds
         setTimeout(() => navigate("/interests", { replace: true }), 2000);

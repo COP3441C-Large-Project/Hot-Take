@@ -75,7 +75,6 @@ class MatchesApi {
       payload['error'] as String? ?? 'Something went wrong.';
 
   static String _defaultBaseUrl() {
-    // Mirrors the same logic as AuthApi
-    return 'http://127.0.0.1:3001';
+    return 'http://167.99.155.122';
   }
 }

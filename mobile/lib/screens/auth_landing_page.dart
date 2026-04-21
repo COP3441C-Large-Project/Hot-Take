@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 
 import '../controllers/auth_controller.dart';
+import '../config/api_config.dart';
 
 enum AuthMode { login, register }
 enum _AuthStage { landing, form, forgot, forgotSent }
@@ -108,7 +109,7 @@ class _AuthLandingPageState extends State<AuthLandingPage> {
 
     try {
       final res = await http.post(
-        Uri.parse('http://127.0.0.1:3001/api/auth/forgot-password'),
+        Uri.parse('${ApiConfig.baseUrl}/api/auth/forgot-password'),
         headers: const {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email}),
       );
