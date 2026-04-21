@@ -235,7 +235,8 @@ class _AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<_AppShell> {
-  int _selectedIndex = 3; // default to matches tab
+  // Now default to 0, which is the Matches page
+  int _selectedIndex = 0; 
 
   late final MatchesController _matchesController;
   late final SocketService _socketService;
@@ -243,7 +244,6 @@ class _AppShellState extends State<_AppShell> {
   @override
   void initState() {
     super.initState();
-
     final token = widget.controller.token!;
     final userId = widget.controller.user!.id;
 
@@ -252,40 +252,29 @@ class _AppShellState extends State<_AppShell> {
       token: token,
       userId: userId,
     );
+    
+    _matchesController.loadMatches();
 
     _socketService = SocketService(token: token, userId: userId);
     _socketService.attach(_matchesController);
-    _socketService.connect('http://127.0.0.1:3001');
-  }
-
-  @override
-  void dispose() {
-    _socketService.disconnect();
-    _matchesController.dispose();
-    super.dispose();
+    _socketService.connect('http://167.99.155.122/');
   }
 
   Widget _buildPage(int index) {
     switch (index) {
       case 0:
-        return const _PlaceholderPage(label: 'home');
-      case 1:
-        return const _PlaceholderPage(label: 'how it works');
-      case 2:
-        return InterestsPage(
-          authController: widget.controller,
-          onSubmitted: () => setState(() => _selectedIndex = 3),
-          );
-      case 3:
         return MatchesPage(
           matchesController: _matchesController,
           authController: widget.controller,
           socketService: _socketService,
         );
-      case 4:
-        return const _PlaceholderPage(label: 'chat');
+      case 1:
+        return InterestsPage(
+          authController: widget.controller,
+          onSubmitted: () => setState(() => _selectedIndex = 0), // Go back to matches
+        );
       default:
-        return const _PlaceholderPage(label: 'home');
+        return Container(); // Fallback
     }
   }
 
@@ -295,32 +284,32 @@ class _AppShellState extends State<_AppShell> {
       body: _buildPage(_selectedIndex),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) =>
-            setState(() => _selectedIndex = index),
+        onDestinationSelected: (index) {
+          // Now index 2 is the Sign Out button
+          if (index == 2) {
+            widget.controller.logout();
+          } else {
+            setState(() => _selectedIndex = index);
+          }
+        },
         backgroundColor: Colors.white,
         indicatorColor: const Color(0xFFFFE9E8),
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home, color: Color(0xFFE24B4A)),
-            label: 'home',
+            icon: Icon(Icons.favorite_outline),
+            selectedIcon: Icon(Icons.favorite, color: Color(0xFFE24B4A)),
+            label: 'matches', // Index 0
           ),
           NavigationDestination(
             icon: Icon(Icons.interests_outlined),
             selectedIcon: Icon(Icons.interests, color: Color(0xFFE24B4A)),
-            label: 'interests',
+            label: 'interests', // Index 1
           ),
           NavigationDestination(
-            icon: Icon(Icons.favorite_outline),
-            selectedIcon: Icon(Icons.favorite, color: Color(0xFFE24B4A)),
-            label: 'matches',
+            icon: Icon(Icons.logout_outlined),
+            selectedIcon: Icon(Icons.logout, color: Color(0xFFE24B4A)),
+            label: 'sign out', // Index 2
           ),
-          NavigationDestination(
-          icon: Icon(Icons.logout_outlined),
-          selectedIcon: Icon(Icons.logout, color: Color(0xFFE24B4A)),
-          label: 'sign out',
-        ),
         ],
       ),
     );
